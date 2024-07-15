@@ -3,10 +3,15 @@
 MODULE_big = pg_redis_proxy
 OBJS = \
 	$(WIN32RES) \
-	redis_proxy.o
+	redis_proxy.o \
+	redis_reqv_parser/redis_reqv_parser.o \
+	redis_reqv_converter/redis_reqv_converter.o
+
 
 EXTENSION = pg_redis_proxy
 DATA = pg_redis_proxy--1.0.sql
+
+override CPPFLAGS += -Iredis_reqv_parser  -Iredis_reqv_converter
 
 ifdef USE_PGXS
 	PG_CONFIG = pg_config
@@ -16,5 +21,5 @@ else
 	subdir = contrib/pg_redis_proxy
 	top_builddir = ../..
 	include $(top_builddir)/src/Makefile.global
-        include $(top_srcdir)/contrib/contrib-global.mk
+    include $(top_srcdir)/contrib/contrib-global.mk
 endif
