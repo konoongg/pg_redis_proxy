@@ -61,6 +61,8 @@ proxy_start_work(Datum main_arg){
         }
         process_redis_to_postgres(command_argc, command_argv);
 
+	command_argc = 0;
+	// clear argv!!
     }
 }
 
