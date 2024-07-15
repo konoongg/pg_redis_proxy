@@ -18,7 +18,6 @@ PG_MODULE_MAGIC;
 
 #define DEFAULT_PORT            (6379)
 #define DEFAULT_BACKLOG_SIZE    (512)
-#define BUFFER_SIZE             (200)
 
 static int init_redis_listener(void);
 PGDLLEXPORT void proxy_start_work(Datum main_arg);
@@ -42,8 +41,6 @@ register_proxy(void){
     RegisterBackgroundWorker(&worker);
 }
 
-
-
 void
 proxy_start_work(Datum main_arg){
     char** command_argv;
@@ -54,13 +51,14 @@ proxy_start_work(Datum main_arg){
         return;
     }
     while(1){
-        parse_cli_mes(fd, &command_argc, &command_argv);
+        if (parse_cli_mes(fd, &command_argc, &command_argv) == -1){
+            return;
+        }
         ereport(LOG, errmsg("argc: %d", command_argc));
         for(int i = 0; i < command_argc; ++i){
             ereport(LOG, errmsg("argv[%d]: %s", i, command_argv[i]));
         }
         process_redis_to_postgres(command_argc, command_argv);
-
     }
 }
 
@@ -68,6 +66,7 @@ static int
 init_redis_listener(void){
     int listen_socket;
     int client_socket;
+    int opt;
     struct sockaddr_in sockaddr;
     listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listen_socket == -1) {
@@ -75,12 +74,18 @@ init_redis_listener(void){
         ereport(ERROR, errmsg("socket(): %s", err));
         return -1 ;
     }
+    opt = 1;
+    if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        char * err = strerror(errno);
+        ereport(ERROR, errmsg("socket(): %s", err));
+        return -1;
+    }
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_port = htons(DEFAULT_PORT);
     sockaddr.sin_addr.s_addr = INADDR_ANY;
     if (bind(listen_socket, (struct sockaddr *)&sockaddr, sizeof(sockaddr))) {
         char * err = strerror(errno);
-        ereport(ERROR, errmsg("bind() error: %s", err));
+        ereport(ERROR, errmsg("bind() error: %s %d", err, listen_socket));
         close(listen_socket);
         return -1;
     }

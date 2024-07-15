@@ -11,7 +11,7 @@ OBJS = \
 EXTENSION = pg_redis_proxy
 DATA = pg_redis_proxy--1.0.sql
 
-override CPPFLAGS += -Iredis_reqv_parser  -Iredis_reqv_converter
+override CPPFLAGS += -I$(CURDIR)/redis_reqv_parser  -I$(CURDIR)/redis_reqv_converter
 
 ifdef USE_PGXS
 	PG_CONFIG = pg_config

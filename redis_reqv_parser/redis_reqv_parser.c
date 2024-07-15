@@ -7,41 +7,71 @@
 
 #include "redis_reqv_parser.h"
 
-void
-skip_symbol(int fd){
-    char c;
-    int readBytes;
-    readBytes = read(fd, &c, 1);
-    if (readBytes == -1) {
-        char * err = strerror(errno);
-        ereport(ERROR, errmsg("skip_symbol: %s", err));
+int cur_buffer_size = 0;
+int cur_buffer_index = 0;
+char read_buffer[BUFFER_SIZE];
+
+int
+read_data(int fd){
+    int readBytes = 0;
+    while(readBytes == 0){
+        readBytes = read(fd, read_buffer, BUFFER_SIZE);
+        cur_buffer_size = readBytes;
+        cur_buffer_index = 0;
+        if (readBytes == -1) {
+            char* err = strerror(errno);
+            ereport(ERROR, errmsg("skip_symbol: %s", err));
+            return -1;
+        }
     }
+    return 0;
 }
+
+void
+replace_part_of_buffer(void){
+    memmove(read_buffer, read_buffer + cur_buffer_index, cur_buffer_size - cur_buffer_index);
+    cur_buffer_size = cur_buffer_size - cur_buffer_index;
+    cur_buffer_index = 0;
+    ereport(LOG, errmsg("REPLACE"));
+}
+
+int
+skip_symbol(int fd){
+    cur_buffer_index++;
+    if(cur_buffer_index >= cur_buffer_size){
+        if(read_data(fd) == -1){
+            return -1;
+        }
+    }
+    return 0;
+}
+
 
 int
 parse_num(int fd, read_status status){
     int num = 0;
-    char c = '0';
-    int readBytes;
+    char c = read_buffer[cur_buffer_index];
     ereport(LOG, errmsg("START PARS INT"));
     if(status != NUM_WAIT){
         return -1;
     }
-    readBytes = read(fd, &c, 1);
     while(c != 13) {
-        if (readBytes == -1) {
-            char * err = strerror(errno);
-            ereport(ERROR, errmsg("read(): %s", err));
+        ereport(LOG, errmsg("SYM NUM : %c %d", c, c));
+        num = (num * 10) + (c - '0');
+        cur_buffer_index++;
+        if(cur_buffer_index >= cur_buffer_size){
+            if(read_data(fd) == -1){
+                return -1;
+            }
         }
-        if(readBytes == 1){
-            ereport(LOG, errmsg("SYM NUM : %c %d", c, c));
-            num = (num * 10) + (c - '0');
-        }
-        readBytes = read(fd, &c, 1);
+        c = read_buffer[cur_buffer_index];
     }
-    //убираем символ отступа, полностью считываем блок с числом
-    skip_symbol(fd);
-    ereport(LOG, errmsg("RETURN NUM : %d", num));
+
+    //skip \r \n
+    if (skip_symbol(fd) == -1){
+        return -1;
+    }
+    ereport(LOG, errmsg("RETURN NUM : %d  index: %d", num, cur_buffer_index));
     return num;
 }
 
@@ -49,31 +79,43 @@ parse_num(int fd, read_status status){
  * instead of 'get' may parse something like 'getV3'
  * Possible solution: make arg of size (string_size + 1) and put \0 to the end.
  */
-void
+int
 parse_string(int fd, char** arg, int* cur_count_argv){
     char c;
     int cur_index = 0;
-    int readBytes;
-    int string_size = parse_num(fd, NUM_WAIT); // what if negative?
+    int string_size;
+    //переходим на первуй знак числа
+    cur_buffer_index++;
+    if(cur_buffer_index >= cur_buffer_size){
+        if(read_data(fd) == -1){
+            return -1;
+        }
+    }
+    string_size = parse_num(fd, NUM_WAIT); // what if negative?
+    // пропускаем \n
+    cur_buffer_index++;
     *arg = (char*)malloc((string_size + 1) * sizeof(char));
     (*arg)[string_size] = '\0';
     ereport(LOG, errmsg("START PARS STRING, size string: %d", string_size));
     while(cur_index != string_size){
-        readBytes = read(fd, &c, 1);
-        if (readBytes == -1) {
-            char * err = strerror(errno);
-            ereport(ERROR, errmsg("read(): %s", err));
-        }
-        if(readBytes == 1){
-            ereport(LOG, errmsg("SYM : %c %d", c, cur_index));
-            (*arg)[cur_index] = c;
-            cur_index++;
+        c = read_buffer[cur_buffer_index];
+        ereport(LOG, errmsg("SYM : %c %d", c, cur_index));
+        (*arg)[cur_index] = c;
+        cur_index++;
+        cur_buffer_index++;
+        if(cur_buffer_index >= cur_buffer_size){
+            ereport(LOG, errmsg("BIG cur_buffer_index %d %d", cur_buffer_index, cur_buffer_size));
+            if(read_data(fd) == -1){
+                return -1;
+            }
         }
     }
     //пропускаем два символа
-    skip_symbol(fd);
-    skip_symbol(fd);
+    if (skip_symbol(fd) == -1){
+        return -1;
+    }
     (*cur_count_argv)--;
+    return 0;
 }
 
 
@@ -90,34 +132,47 @@ parse_string(int fd, char** arg, int* cur_count_argv){
  *
  * Message parser. Converts
 */
-void
+int
 parse_cli_mes(int fd, int* command_argc, char*** command_argv){
-    char c;
     read_status status = ARRAY_WAIT;
-    //сколько осталось считать аргументов
     int cur_count_argv;
-    int readBytes;
-    ereport(LOG, errmsg("START MESSAGE PARSING"));
-    while(1){
-        readBytes = read(fd, &c, 1);
-        if (readBytes == -1) {
-            char * err = strerror(errno);
-            ereport(ERROR, errmsg("read(): %s", err));
+    ereport(LOG, errmsg("START MESSAGE PARSING %d %d", cur_buffer_index, cur_buffer_size));
+    if(cur_buffer_size == 0){
+        if(read_data(fd) == -1){
+            return -1;
         }
-        if(readBytes == 1){
-            ereport(LOG, errmsg("SYM: %c", c));
-            if(c == '*' && status == ARRAY_WAIT){
-                status = NUM_WAIT;
-                cur_count_argv = *command_argc = parse_num(fd, status);
-                ereport(LOG, errmsg("count: %d", *command_argc));
-                *command_argv = (char**)malloc(*command_argc * sizeof(char*));
-                status = STRING_WAIT;
+    }
+    while(1){
+        char c = read_buffer[cur_buffer_index];
+        if(c == '*' && status == ARRAY_WAIT){
+            status = NUM_WAIT;
+            //переходим на первуй знак числа
+            cur_buffer_index++;
+            if(cur_buffer_index >= cur_buffer_size){
+                if(read_data(fd) == -1){
+                    return -1;
+                }
             }
-            else if(c == '$' && status == STRING_WAIT){
-                parse_string(fd, &((*command_argv)[*command_argc - cur_count_argv]), &cur_count_argv);
-            }
-            if(cur_count_argv == 0){
-                return;
+            cur_count_argv = *command_argc = parse_num(fd, status);
+            ereport(LOG, errmsg("count: %d", *command_argc));
+            *command_argv = (char**)malloc(*command_argc * sizeof(char*));
+            status = STRING_WAIT;
+            ereport(LOG, errmsg("FINISH NUM PARSING"));
+        }
+        else if(c == '$' && status == STRING_WAIT){
+            parse_string(fd, &((*command_argv)[*command_argc - cur_count_argv]), &cur_count_argv);
+            ereport(LOG, errmsg("FINISH STRING PARSING"));
+        }
+        cur_buffer_index++;
+        if(cur_count_argv == 0){
+            replace_part_of_buffer();
+            ereport(LOG, errmsg("FINISH  ARGV PARSING"));
+            return 0;
+        }
+        if(cur_buffer_index >= cur_buffer_size){
+            ereport(LOG, errmsg("BIG cur_buffer_index %d %d", cur_buffer_index, cur_buffer_size));
+            if(read_data(fd) == -1){
+                return -1;
             }
         }
     }

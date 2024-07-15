@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-
 #include "redis_reqv_converter.h"
 
 /*
