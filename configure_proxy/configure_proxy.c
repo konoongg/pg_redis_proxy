@@ -11,7 +11,9 @@
 
 #include "configure_proxy.h"
 
-
+/*
+ * After execution of this function, extension will start listening on port
+ */
 int
 init_redis_listener(void){
     int listen_socket;
