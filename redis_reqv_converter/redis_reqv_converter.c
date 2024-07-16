@@ -5,6 +5,8 @@
 #include <stdlib.h>
 
 #include "redis_reqv_converter.h"
+#include "../work_with_db/work_with_db.h"
+#include "../configure_proxy/configure_proxy.h"
 
 /*
  * Processing part (Redis command to PostgreSQL query)
@@ -16,7 +18,19 @@
  */
 void
 process_get(int command_argc, char** command_argv) {
-    ereport(LOG, errmsg("IN process_get: %s", command_argv[0])); // plug
+    char* value;
+    int res = get_value(get_cur_table(), command_argv[1], &value);
+    ereport(LOG, errmsg("START GET"));
+    if(res == non){
+        ereport(LOG, errmsg("IN process_get: %s non key: %s", command_argv[0], command_argv[1]));
+    }
+    else if(res == err){
+        ereport(LOG, errmsg("IN process_get: %s err with key: %s", command_argv[0], command_argv[1]));
+    }
+    else{
+        ereport(LOG, errmsg("IN process_get: %s  key:%s value: %s", command_argv[0], command_argv[1], value));
+    }
+    ereport(LOG, errmsg("FINISH GET"));
 }
 
 // should return +OK (or smth like that) if it worked
@@ -61,6 +75,7 @@ process_redis_to_postgres(int command_argc, char** command_argv) {
     to_big_case(command_argv[0]); // converting to upper, since commands are in upper case
 
     if (!strcmp(command_argv[0], "GET")) {
+        process_get(command_argc, command_argv);
         ereport(LOG, errmsg("GET_PROCESSING: %s", command_argv[0]));
 
     } else if (!strcmp(command_argv[0], "SET")) {
