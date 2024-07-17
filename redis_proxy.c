@@ -13,12 +13,11 @@
 #include "miscadmin.h"
 #include "tcop/tcopprot.h"
 
-#include "redis_reqv_parser/redis_reqv_parser.h"
+#include "work_with_socket/work_with_socket.h"
 #include "redis_reqv_converter/redis_reqv_converter.h"
 #include "configure_proxy/configure_proxy.h"
 #include "work_with_db/work_with_db.h"
 #include "postgres_reqv_converter/postgres_reqv_converter.h"
-#include "work_with_socket/work_with_socket.h"
 
 #ifdef PG_MODULE_MAGIC
     PG_MODULE_MAGIC;
@@ -34,22 +33,6 @@ static void register_proxy(void);
 void
 _PG_init(void){
     register_proxy();
-}
-
-int
-write_data(int fd, char* mes, int count_sum){
-    int writeBytes = 0;
-    int cur_write_bytes = 0;
-    while(cur_write_bytes != count_sum){
-        writeBytes = write(fd, mes + cur_write_bytes, count_sum - cur_write_bytes);
-        if(writeBytes == -1){
-            char* err = strerror(errno);
-            ereport(ERROR, errmsg("write err: %s", err));
-            return -1;
-        }
-        cur_write_bytes += writeBytes;
-    }
-    return 0;
 }
 
 static void

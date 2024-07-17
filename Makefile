@@ -5,7 +5,7 @@ MODULE_big = pg_redis_proxy
 OBJS = \
 	$(WIN32RES) \
 	redis_proxy.o \
-	redis_reqv_parser/redis_reqv_parser.o \
+	work_with_socket/work_with_socket.o \
 	redis_reqv_converter/redis_reqv_converter.o \
 	configure_proxy/configure_proxy.o \
 	work_with_db/work_with_db.o \

@@ -34,7 +34,7 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     int count_shell_sym = 0;
     size_t size_reqv_data = (size_reqv == 1) ? 0 : size_reqv - 2;
     char size [20]; // max count symbol for size_t
-    ereport(LOG, errmsg("START CreateStr: %s %d ", reqv, size_reqv));
+    ereport(LOG, errmsg("START CreateStr: %s %ld ", reqv, size_reqv));
     if(size_reqv_data == 0){
         count_write_sym = 2;
         size[0] = '-';
@@ -50,7 +50,7 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         count_shell_sym = 1 + count_write_sym + 2 + 2;  // 1 - $; count_write_sym - size; 2 - /r/n after size; 2 = /r/n after data;
     }
     *size_answer = size_reqv_data + count_shell_sym;
-    ereport(LOG, errmsg("size_reqv_data: %d, count_shell_sym: %d", size_reqv_data, count_shell_sym));
+    ereport(LOG, errmsg("size_reqv_data: %ld, count_shell_sym: %d", size_reqv_data, count_shell_sym));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
         ereport(LOG, errmsg("ERROR MALLOC"));
