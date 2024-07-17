@@ -12,5 +12,4 @@ int parse_cli_mes(int fd, int* command_argc, char*** command_argv);
 int parse_num(int fd, read_status status);
 int parse_string(int fd, char** arg, int* cur_count_argv);
 int skip_symbol(int fd);
-int read_data(int fd);
 void replace_part_of_buffer(void);

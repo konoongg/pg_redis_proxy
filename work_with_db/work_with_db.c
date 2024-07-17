@@ -30,10 +30,11 @@ init_work_with_db(void){
     return 0;
 }
 
-get_value_result
-get_value(char* table, char* key, char** value){
+req_result
+get_value(char* table, char* key, char** value, int* length){
     char SELECT[200];
     int n_rows;
+    ereport(LOG, errmsg("SELECT: %s", table));
     if (sprintf(SELECT, "SELECT value FROM %s WHERE key=\'%s\'", table, key) < 0) {
         ereport(ERROR, errmsg( "sprintf err"));
         PQfinish(conn);
@@ -58,8 +59,30 @@ get_value(char* table, char* key, char** value){
 
     }
     *value = PQgetvalue(res, 0, 0);
+    *length = PQgetlength(res, 0, 0) + 1; // + \0
+    ereport(LOG, errmsg("answer: %ssize: %d", PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
     return ok;
 }
+
+req_result
+set_value(char* table, char* key, char* value){
+    char INSERT[200];
+    ereport(LOG, errmsg("INSERT: %s", table));
+    if (sprintf(INSERT, "INSERT INTO %s (key, value) VALUES (\'%s\', \'%s\')", table, key, value) < 0) {
+        ereport(ERROR, errmsg( "sprintf err"));
+        PQfinish(conn);
+        return err;
+    }
+    res = PQexec(conn, INSERT);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        ereport(ERROR, errmsg("select table failed: %s", PQerrorMessage(conn)));
+        PQclear(res);
+        PQfinish(conn);
+        return err;
+    }
+    return ok;
+}
+
 
 void
 finish_work_with_db(void){

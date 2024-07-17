@@ -11,30 +11,14 @@
 #include <signal.h>
 #include "postmaster/interrupt.h"
 #include "miscadmin.h"
-
-#include "postgres.h"
-#include "utils/builtins.h"
-#include "fmgr.h"
-#include "executor/executor.h"
-#include "utils/guc.h"
-#include "pg_config.h"
-#include "postmaster/bgworker.h"
 #include "tcop/tcopprot.h"
-#include "miscadmin.h"
-#include "postmaster/interrupt.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include "storage/lwlock.h"
-#include "storage/shmem.h"
-#include "storage/ipc.h"
-
-
 
 #include "redis_reqv_parser/redis_reqv_parser.h"
 #include "redis_reqv_converter/redis_reqv_converter.h"
 #include "configure_proxy/configure_proxy.h"
 #include "work_with_db/work_with_db.h"
+#include "postgres_reqv_converter/postgres_reqv_converter.h"
+#include "work_with_socket/work_with_socket.h"
 
 #ifdef PG_MODULE_MAGIC
     PG_MODULE_MAGIC;
@@ -52,10 +36,26 @@ _PG_init(void){
     register_proxy();
 }
 
+int
+write_data(int fd, char* mes, int count_sum){
+    int writeBytes = 0;
+    int cur_write_bytes = 0;
+    while(cur_write_bytes != count_sum){
+        writeBytes = write(fd, mes + cur_write_bytes, count_sum - cur_write_bytes);
+        if(writeBytes == -1){
+            char* err = strerror(errno);
+            ereport(ERROR, errmsg("write err: %s", err));
+            return -1;
+        }
+        cur_write_bytes += writeBytes;
+    }
+    return 0;
+}
+
 static void
 register_proxy(void){
     BackgroundWorker worker;
-    MemSet(&worker, 0, sizeof(BackgroundWorker));
+    memset(&worker, 0, sizeof(BackgroundWorker));
     worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
     worker.bgw_start_time = BgWorkerStart_RecoveryFinished;
     strcpy(worker.bgw_library_name, "pg_redis_proxy");
@@ -67,8 +67,12 @@ register_proxy(void){
 
 void
 proxy_start_work(Datum main_arg){
-    char** command_argv;
-    int command_argc;
+    char** command_argv = NULL;
+    char* rd_answer = NULL;
+    char* pg_answer = NULL;
+    int command_argc = 0;
+    int size_pg_answer = 0;
+    int size_rd_answer = 0;
     int fd = init_redis_listener();
     ereport(LOG, errmsg("START WORKER RF"));
     if(init_table() == -1){
@@ -98,7 +102,24 @@ proxy_start_work(Datum main_arg){
         for(int i = 0; i < command_argc; ++i){
             ereport(LOG, errmsg("argv[%d]: %s", i, command_argv[i]));
         }
-        process_redis_to_postgres(command_argc, command_argv);
+        if (process_redis_to_postgres(command_argc, command_argv, &pg_answer, &size_pg_answer) == -1){
+            ereport(ERROR, errmsg("process redis to postgres"));
+            return;
+        }
+        if (define_type_req(pg_answer, &rd_answer, size_pg_answer, &size_rd_answer) == -1){
+            ereport(ERROR, errmsg("can't translate pg_answer to rd_answer"));
+            return;
+        }
+        if(write_data(fd, rd_answer, size_rd_answer ) == -1){
+            ereport(ERROR, errmsg("can't write data on socket"));
+            return;
+        }
     }
     finish_work_with_db();
+    for(int i = 0; i < command_argc; ++i){
+        free(command_argv[i]);
+    }
+    free(command_argv);
+    free(pg_answer);
+    free(rd_answer);
 }

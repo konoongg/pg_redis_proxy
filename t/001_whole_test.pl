@@ -177,4 +177,3 @@ for (keys %correct_resp_tests) {
 
 done_testing();
 $socket->close();
-

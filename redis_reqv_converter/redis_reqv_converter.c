@@ -12,51 +12,83 @@
  * Processing part (Redis command to PostgreSQL query)
  * ["get", "key", "value"] =>
  * "SELECT value FROM pg_redis_table WHERE key=key"
- *
- * Warning: totally untested.
- * TODO: put all of the processing into different files.
  */
-void
-process_get(int command_argc, char** command_argv) {
+int
+process_get(char* key, char** pg_answer, int* size_pg_answer){
     char* value;
-    int res = get_value(get_cur_table(), command_argv[1], &value);
+    int length_value = 0;
+    req_result res = get_value(get_cur_table(), key, &value, &length_value);
     ereport(LOG, errmsg("START GET"));
     if(res == non){
-        ereport(LOG, errmsg("IN process_get: %s non key: %s", command_argv[0], command_argv[1]));
+        ereport(LOG, errmsg("IN process_get: GET non key: %s",key));
+        *pg_answer = (char*)malloc( sizeof(char));
+        if(*pg_answer == NULL){
+            ereport(LOG, errmsg("ERROR MALLOC"));
+            return -1;
+        }
+        (*pg_answer)[0] = 3;
+        *size_pg_answer = 1;
     }
     else if(res == err){
-        ereport(LOG, errmsg("IN process_get: %s err with key: %s", command_argv[0], command_argv[1]));
+        ereport(LOG, errmsg("IN process_get: GET err with key: %s", key));
+        return -1;
     }
     else{
-        ereport(LOG, errmsg("IN process_get: %s  key:%s value: %s", command_argv[0], command_argv[1], value));
+        ereport(LOG, errmsg("IN process_get: GET  key: %s value: %s", key, value));
+        *size_pg_answer = (length_value + 1);
+        *pg_answer = (char*)malloc(  *size_pg_answer * sizeof(char));
+        (*pg_answer)[0] = 3;
+        memcpy((*pg_answer) + 1, value, length_value);
     }
     ereport(LOG, errmsg("FINISH GET"));
+    return 0;
 }
 
 // should return +OK (or smth like that) if it worked
-void
-process_set(int command_argc, char** command_argv) {
-    ereport(LOG, errmsg("IN process_get: %s", command_argv[0])); // plug
+int
+process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
+    req_result res = set_value(get_cur_table(), key, value);
+    ereport(LOG, errmsg("START SET"));
+    if(res == err){
+        ereport(LOG, errmsg("IN process_set: SET err with key: %s value: %s", key, value));
+        return -1;
+    }
+    else{
+        *pg_answer = (char*)malloc( 4 * sizeof(char));
+        if(*pg_answer == NULL){
+            ereport(LOG, errmsg("ERROR MALLOC"));
+            return -1;
+        }
+        *size_pg_answer = 4;
+        (*pg_answer)[0] = 0;
+        (*pg_answer)[1] = 'o';
+        (*pg_answer)[2] = 'k';
+        (*pg_answer)[3] = '\0';
+        ereport(LOG, errmsg("IN process_set: SET key:%s value: %s", key, value));
+    }
+    return 0;
 }
 
-// TODO: improve it.
-void
+int
 process_command(int command_argc, char** command_argv) {
-    ereport(LOG, errmsg("IN process_command")); // plug
+    ereport(LOG, errmsg("IN process_command"));
+    return 0;// plug
     // or better: this should return something like "$3\r\n(all commands supported)\r\n"
 }
 
-void
+int
 process_ping(int command_argc, char** command_argv) {
     ereport(LOG, errmsg("IN process_ping")); // plug
+    return 0;
     // should return smth like "+PONG" probably
 }
 
 void
 to_big_case(char* string) {
     for (int i = 0; i < strlen(string); ++i) {
-        if (string[i] >= 'a' && string[i] <= 'z')
+        if (string[i] >= 'a' && string[i] <= 'z'){
             string[i] = string[i] + ('A' - 'a');
+        }
     }
 }
 
@@ -65,26 +97,35 @@ to_big_case(char* string) {
  * basic cases ("get", "set", etc.)
  * TODO: all commands. Or as many commands as possible
  */
-void
-process_redis_to_postgres(int command_argc, char** command_argv) {
+int
+process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
     if (command_argc == 0) {
-        return; // nothing to process to db
+        return -1; // nothing to process to db
     }
     ereport(LOG, errmsg("PROCESSING STARTED"));
-
     to_big_case(command_argv[0]); // converting to upper, since commands are in upper case
-
     if (!strcmp(command_argv[0], "GET")) {
-        process_get(command_argc, command_argv);
+        if (command_argc < 2) {
+            ereport(ERROR, errmsg("need more arg for GET"));
+            return -1;
+        }
         ereport(LOG, errmsg("GET_PROCESSING: %s", command_argv[0]));
-
-    } else if (!strcmp(command_argv[0], "SET")) {
+        return process_get(command_argv[1], pg_answer, size_pg_answer);
+    }
+    else if (!strcmp(command_argv[0], "SET")) {
+        if (command_argc < 3) {
+            ereport(ERROR, errmsg("need more arg for SET"));
+            return -1;
+        }
         ereport(LOG, errmsg("SET_PROCESSING: %s", command_argv[0]));
+        return  process_set(command_argv[1], command_argv[2], pg_answer, size_pg_answer);;
 
     } else if (!strcmp(command_argv[0], "COMMAND")) {
         ereport(LOG, errmsg("COMMAND_PROCESSING: %s", command_argv[0]));
+        return 0;
 
     } else { // command not found "exception"
         ereport(LOG, errmsg("COMMAND NOT FOUND: %s", command_argv[0]));
+        return -1;
     }
 }

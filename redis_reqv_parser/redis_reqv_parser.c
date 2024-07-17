@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "redis_reqv_parser.h"
+#include "../work_with_socket/work_with_socket.h"
 
 int cur_buffer_size = 0;
 int cur_buffer_index = 0;
@@ -113,6 +114,10 @@ parse_string(int fd, char** arg, int* cur_count_argv){
 	// skipping \n	
     cur_buffer_index++;
     *arg = (char*)malloc((string_size + 1) * sizeof(char));
+    if(*arg == NULL){
+        ereport(LOG, errmsg("ERROR MALLOC"));
+        return -1;
+    }
     (*arg)[string_size] = '\0';
     ereport(LOG, errmsg("START PARS STRING, size string: %d", string_size));
     while(cur_index != string_size){
@@ -182,6 +187,10 @@ parse_cli_mes(int fd, int* command_argc, char*** command_argv){
             cur_count_argv = *command_argc = parse_num(fd, status);
             ereport(LOG, errmsg("count: %d", *command_argc));
             *command_argv = (char**)malloc(*command_argc * sizeof(char*));
+            if(*command_argv == NULL){
+                ereport(LOG, errmsg("ERROR MALLOC"));
+                return -1;
+            }
             status = STRING_WAIT;
             ereport(LOG, errmsg("FINISH NUM PARSING"));
         }

@@ -1,13 +1,13 @@
 #pragma once
 
-enum get_value_result {
+enum req_result{
     err = -1,
     ok,
     non
 
-} typedef get_value_result;
+} typedef req_result;
 
-get_value_result get_value(char* table, char* key, char** value);
-int set_value(char* table, char* key, char* value);
+req_result get_value(char* table, char* key, char** value, int* length);
+req_result set_value(char* table, char* key, char* value);
 int init_work_with_db(void);
 void finish_work_with_db(void);

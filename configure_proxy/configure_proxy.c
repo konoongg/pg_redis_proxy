@@ -7,12 +7,9 @@
 #include <stdlib.h>
 #include "libpq-fe.h"
 
-
 #include "configure_proxy.h"
 
-
 struct proxy_status* proxy_configure;
-
 
 /*
  * After execution of this function, extension will start listening on port

@@ -8,7 +8,8 @@ OBJS = \
 	redis_reqv_parser/redis_reqv_parser.o \
 	redis_reqv_converter/redis_reqv_converter.o \
 	configure_proxy/configure_proxy.o \
-	work_with_db/work_with_db.o
+	work_with_db/work_with_db.o \
+	postgres_reqv_converter/postgres_reqv_converter.o
 
 
 EXTENSION = pg_redis_proxy
