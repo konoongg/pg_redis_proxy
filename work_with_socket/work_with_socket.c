@@ -3,13 +3,44 @@
 #include <unistd.h>
 #include "utils/elog.h"
 #include <string.h>
+#include <stdbool.h>
+#include <sys/socket.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <ev.h>
 
 #include "work_with_socket.h"
 
 int cur_buffer_size = 0;
 int cur_buffer_index = 0;
 char read_buffer[BUFFER_SIZE];
+
+void
+close_connection(EV_P_ struct ev_io* io_handle) {
+    Tsocket_data* data = (Tsocket_data*)io_handle->data;
+    ev_io_stop(loop, io_handle);
+    close(io_handle->fd);
+    for(int i = 0; i < data->argc; ++i){
+        free(data->argv[i]);
+    }
+    free(data->argv);
+    free(data->parsing.parsing_str);
+    free(data);
+    free(io_handle);
+}
+
+
+bool
+socket_set_nonblock(int socket_fd){
+    int flags = fcntl(socket_fd, F_GETFL, 0);
+    if (flags < 0) {
+        return false;
+    }
+    if (fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        return false;
+    }
+    return true;
+}
 
 
 int
@@ -28,136 +59,6 @@ write_data(int fd, char* mes, int count_sum){
     return 0;
 }
 
-int
-read_data(int fd){
-    int readBytes = 0;
-    while(readBytes == 0){
-        readBytes = read(fd, read_buffer, BUFFER_SIZE);
-        cur_buffer_size = readBytes;
-        cur_buffer_index = 0;
-        if (readBytes == -1) {
-            char* err = strerror(errno);
-            ereport(ERROR, errmsg("skip_symbol: %s", err));
-            return -1;
-        }
-    }
-    return 0;
-}
-
-void
-replace_part_of_buffer(void){
-    memmove(read_buffer, read_buffer + cur_buffer_index, cur_buffer_size - cur_buffer_index);
-    cur_buffer_size = cur_buffer_size - cur_buffer_index;
-    cur_buffer_index = 0;
-    ereport(LOG, errmsg("REPLACE"));
-}
-
-int
-skip_symbol(int fd){
-    cur_buffer_index++;
-    if(cur_buffer_index >= cur_buffer_size){
-        if(read_data(fd) == -1){
-            return -1;
-        }
-    }
-    return 0;
-}
-
-/* 
- * Retrieves integer value from user request
- * *2\r\n$343\r\nAAAAAAAAAAAA...
- *        ^
- * =>
- * *2\r\n$343\r\nAAAAAAAAAAAA...
- *             ^^
- *  and 343 will be returned as result
- */
-int
-parse_num(int fd, read_status status){
-    int num = 0;
-    char c = read_buffer[cur_buffer_index];
-    ereport(LOG, errmsg("START PARS INT"));
-    if(status != NUM_WAIT){
-        return -1;
-    }
-
-	// reading any chars as digits until \r symbol
-    while(c != 13) {
-        ereport(LOG, errmsg("SYM NUM : %c %d", c, c));
-        num = (num * 10) + (c - '0');
-        cur_buffer_index++;
-        if(cur_buffer_index >= cur_buffer_size){
-            if(read_data(fd) == -1){
-                return -1;
-            }
-        }
-        c = read_buffer[cur_buffer_index];
-    }
-
-    //skip \r
-    if (skip_symbol(fd) == -1){
-        return -1;
-    }
-    ereport(LOG, errmsg("RETURN NUM : %d  index: %d", num, cur_buffer_index));
-    return num;
-}
-
-/*
- * Retrieves string value from user request
- * Example of how it works:
- * *2\r\n$3\r\nget\r\n$5\r\nvalue\r\n
- *       ^
- * =>
- * *2\r\n$3\r\nget\r\n$5\r\nvalue\r\n
- *                    ^
- *   (*arg)="get"
- */
-int
-parse_string(int fd, char** arg, int* cur_count_argv){
-    char c;
-    int cur_index = 0;
-    int string_size;
-
-    // skipping $
-    cur_buffer_index++;
-    if(cur_buffer_index >= cur_buffer_size){
-        if(read_data(fd) == -1){
-            return -1;
-        }
-    }
-
-    string_size = parse_num(fd, NUM_WAIT); // what if negative?
-	// skipping \n	
-    cur_buffer_index++;
-    *arg = (char*)malloc((string_size + 1) * sizeof(char));
-    if(*arg == NULL){
-        ereport(LOG, errmsg("ERROR MALLOC"));
-        return -1;
-    }
-    (*arg)[string_size] = '\0';
-    ereport(LOG, errmsg("START PARS STRING, size string: %d", string_size));
-    while(cur_index != string_size){
-        c = read_buffer[cur_buffer_index];
-        ereport(LOG, errmsg("SYM : %c %d", c, cur_index));
-        (*arg)[cur_index] = c;
-        cur_index++;
-        cur_buffer_index++;
-        if(cur_buffer_index >= cur_buffer_size){
-            ereport(LOG, errmsg("BIG cur_buffer_index %d %d", cur_buffer_index, cur_buffer_size));
-            if(read_data(fd) == -1){
-                return -1;
-            }
-        }
-    }
-    // skipping \r
-    if (skip_symbol(fd) == -1){
-        return -1;
-    }
-    (*cur_count_argv)--;
-    return 0;
-}
-
-
 /*
  * According to RESP protocol, client sends only arrays of bulk strings, like:
  * *2\r\n$3\r\nget\r\n$5\r\nvalue\r\n
@@ -175,56 +76,139 @@ parse_string(int fd, char** arg, int* cur_count_argv){
  * *2\r\n$3\r\nget\r\n$5\r\nvalue\r\n
  * => command_argv = ["get", "value"], command_argc = 2
 */
-int
-parse_cli_mes(int fd, int* command_argc, char*** command_argv){
-    read_status status = ARRAY_WAIT;
-    int cur_count_argv;
-    ereport(LOG, errmsg("START MESSAGE PARSING %d %d", cur_buffer_index, cur_buffer_size));
-    if(cur_buffer_size == 0){
-        if(read_data(fd) == -1){
-            return -1;
-        }
-    }
+void
+parse_cli_mes(Tsocket_data* data){
+    int cur_buffer_index = 0;
+    ereport(LOG, errmsg("SIZE: %d", data->cur_buffer_size));
     while(1){
-        char c = read_buffer[cur_buffer_index];
-        if(c == '*' && status == ARRAY_WAIT){
-            status = NUM_WAIT;
-
-	    // moving to first sign of number
-            cur_buffer_index++;
-            if(cur_buffer_index >= cur_buffer_size){
-                if(read_data(fd) == -1){
-                    return -1;
+        // конечные автоматы наше все
+        char c = data->read_buffer[cur_buffer_index];
+        ereport(LOG, errmsg("SYM %c %d ", c, c));
+        if(c == '*' && data->read_status == ARRAY_WAIT){
+            ereport(LOG, errmsg("START PARS INT"));
+            data->read_status = NUM_WAIT;
+        }
+        else if(c >= '0' && c <= '9' && data->read_status == NUM_WAIT){
+            ereport(LOG, errmsg("SYM NUM : %c %d", c, c));
+            if(data->read_status != NUM_WAIT){
+                return;
+            }
+            data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
+        }
+        else if(c == '\r' && data->read_status == NUM_WAIT){
+            ereport(LOG, errmsg("NUM: %d",data->parsing.parsing_num ));
+            if(data->argc == -1){
+                data->argc = data->parsing.parsing_num;
+                ereport(LOG, errmsg("ARGC: %d", data->argc));
+                data->cur_count_argv = 0;
+                data->read_status = START_STRING_WAIT;
+                data->argv = (char**)malloc(data->argc * sizeof(char*));
+                if(data->argv == NULL){
+                    ereport(ERROR, errmsg("CAN'T MALLOC"));
+                    data->exit_status = ERR;
+                    return;
                 }
             }
-	    // parsing number that (should) come after asterisk
-            cur_count_argv = *command_argc = parse_num(fd, status);
-            ereport(LOG, errmsg("count: %d", *command_argc));
-            *command_argv = (char**)malloc(*command_argc * sizeof(char*));
-            if(*command_argv == NULL){
-                ereport(LOG, errmsg("ERROR MALLOC"));
-                return -1;
+            else{
+                data->parsing.size_str = data->parsing.parsing_num;
+                data->parsing.cur_size_str = 0;
+                data->parsing.parsing_str = (char*)malloc((data->parsing.size_str + 1)  * sizeof(char));
+                data->read_status = STRING_WAIT;
+                if(data->parsing.parsing_str == NULL){
+                    ereport(ERROR, errmsg("CAN'T MALLOC"));
+                    data->exit_status = ERR;
+                    return;
+                }
             }
-            status = STRING_WAIT;
-            ereport(LOG, errmsg("FINISH NUM PARSING"));
+            data->parsing.parsing_num = 0;
         }
-        else if(c == '$' && status == STRING_WAIT){
-            parse_string(fd, &((*command_argv)[*command_argc - cur_count_argv]), &cur_count_argv);
-            ereport(LOG, errmsg("FINISH STRING PARSING"));
+        else if(c == '\n' && data->read_status == START_STRING_WAIT){
+            //skip
         }
-
-		// skipping \n after string
+        else if(c == '\n' && data->read_status == STRING_WAIT){
+            data->read_status = STR_SYM_WAIT;
+        }
+        else if(c == '$' && data->read_status == START_STRING_WAIT){
+            data->read_status = NUM_WAIT;
+        }
+        else if(data->read_status == STR_SYM_WAIT){
+            data->parsing.parsing_str[data->parsing.cur_size_str] = c;
+            data->parsing.cur_size_str += 1;
+            if(data->parsing.cur_size_str == data->parsing.size_str){
+                data->parsing.parsing_str[data->parsing.size_str] = '\0';
+                ereport(LOG, errmsg("STR :%s cur_count_argv: %d", data->parsing.parsing_str, data->cur_count_argv));
+                data->argv[data->cur_count_argv] = (char*)malloc((data->parsing.size_str + 1) * sizeof(char));
+                if(data->argv[data->cur_count_argv] == NULL){
+                    ereport(ERROR, errmsg("CAN'T MALLOC"));
+                    data->exit_status = ERR;
+                    return;
+                }
+                memcpy(data->argv[data->cur_count_argv], data->parsing.parsing_str, data->parsing.size_str + 1);
+                ereport(LOG, errmsg("+ arg: %s  %s ", data->argv[data->cur_count_argv], data->parsing.parsing_str));
+                free(data->parsing.parsing_str);
+                data->cur_count_argv++;
+                data->parsing.size_str = data->parsing.cur_size_str = 0;
+                if(data->cur_count_argv == data->argc){
+                    ereport(LOG, errmsg("ARGC final: %d", data->argc));
+                    replace_part_of_buffer(data, cur_buffer_index);
+                    ereport(LOG, errmsg("ARGC final: %d", data->argc));
+                    data->exit_status = ALL;
+                    return;
+                }
+                data->read_status = START_STRING_WAIT;
+            }
+        }
         cur_buffer_index++;
-        if(cur_count_argv == 0){
-            replace_part_of_buffer();
-            ereport(LOG, errmsg("FINISH  ARGV PARSING"));
-            return 0;
-        }
-        if(cur_buffer_index >= cur_buffer_size){
-            ereport(LOG, errmsg("BIG cur_buffer_index %d %d", cur_buffer_index, cur_buffer_size));
-            if(read_data(fd) == -1){
-                return -1;
-            }
+        if(cur_buffer_index >= data->cur_buffer_size){
+            ereport(LOG, errmsg("NOT ALL DATA :%s %d %d", data->read_buffer, cur_buffer_index, data->cur_buffer_size));
+            data->cur_buffer_size = 0;
+            data->exit_status = NOT_ALL;
+            return;
         }
     }
+}
+
+void
+replace_part_of_buffer(Tsocket_data* data, int cur_buffer_index){
+    ereport(LOG, errmsg("ARGC final1: %d", data->argc));
+    memmove(data->read_buffer, data->read_buffer + cur_buffer_index, data->cur_buffer_size - cur_buffer_index);
+    data->cur_buffer_size -=  cur_buffer_index;
+    ereport(LOG, errmsg("REPLACE"));
+}
+
+
+/*
+ * Retrieves string value from user request
+ * Example of how it works:
+ * *2\r\n$3\r\nget\r\n$5\r\nvalue\r\n
+ *       ^
+ * =>
+ * *2\r\n$3\r\nget\r\n$5\r\nvalue\r\n
+ *                    ^
+ *   (*arg)="get"
+ */
+int
+get_socket(int fd){
+    int socket_fd = accept(fd, NULL, NULL);
+    ereport(LOG, errmsg( "ACCEPT: %d", socket_fd));
+    if (socket_fd == -1) {
+        char* err = strerror(errno);
+        ereport(ERROR, errmsg("on_accept_cb(): %s", err));
+        return -1;
+    }
+    if (!socket_set_nonblock(fd)) {
+        close(socket_fd);
+        return -1;
+    }
+    return socket_fd;
+}
+
+int
+read_data(EV_P_ struct ev_io* io_handle, char* read_buffer, int cur_buffer_size ){
+    int res = read(io_handle->fd, read_buffer + cur_buffer_size, BUFFER_SIZE - cur_buffer_size);
+    if (!res || res < 0) {
+        close_connection(loop, io_handle);
+        return - 1;
+    }
+    return res;
 }

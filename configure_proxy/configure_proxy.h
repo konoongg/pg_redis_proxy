@@ -9,7 +9,6 @@ struct proxy_status{
     char cur_table[100];
 } typedef proxy_status;
 
-int init_redis_listener(void);
 int init_table(void);
 char check_table(char* new_table_name,  PGresult* res);
 char* get_cur_table(void);

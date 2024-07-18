@@ -61,8 +61,8 @@ process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
         }
         *size_pg_answer = 4;
         (*pg_answer)[0] = 0;
-        (*pg_answer)[1] = 'o';
-        (*pg_answer)[2] = 'k';
+        (*pg_answer)[1] = 'O';
+        (*pg_answer)[2] = 'K';
         (*pg_answer)[3] = '\0';
         ereport(LOG, errmsg("IN process_set: SET key:%s value: %s", key, value));
     }
@@ -99,10 +99,10 @@ to_big_case(char* string) {
  */
 int
 process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
+    ereport(LOG, errmsg("PROCESSING STARTED %d", command_argc));
     if (command_argc == 0) {
         return -1; // nothing to process to db
     }
-    ereport(LOG, errmsg("PROCESSING STARTED"));
     to_big_case(command_argv[0]); // converting to upper, since commands are in upper case
     if (!strcmp(command_argv[0], "GET")) {
         if (command_argc < 2) {

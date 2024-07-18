@@ -15,8 +15,8 @@ OBJS = \
 EXTENSION = pg_redis_proxy
 DATA = pg_redis_proxy--1.0.sql
 
-SHLIB_LINK += -lpq
-PG_CPPFLAGS = -lpq
+SHLIB_LINK += -lpq -lev
+PG_CPPFLAGS = -lpq -lev
 
 override CPPFLAGS += -I$(CURDIR)/redis_reqv_parser  -I$(CURDIR)/redis_reqv_converter -I$(CURDIR)configure_proxy -I/usr/include/postgresql
 
