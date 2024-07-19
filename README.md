@@ -2,11 +2,16 @@
 A redis proxy extension for postgreSQL database.
 
 ## Installation
+Install dependecies:
+1) libev
+2) libtap++
+
 Copy this repo into `$YOUR_PATH_TO_POSTGRES/contrib` folder,
 then "remake" project:
 
 ```
 make install
+make install -C $YOUR_PATH_TO_POSTGERS/contrib/hstore
 make install -C $YOUR_PATH_TO_POSTGRES/contrib/pg_redis_proxy
 ```
 
@@ -20,6 +25,6 @@ proxy converts result so it fits RESP protocol(4), returns result to the user(5)
 ## Stages of development:
 1) done, but untested and probably bugged
 2) only frame partly done; "accepts" only 4 commands for now: get, set, command, ping
-3) not done
-4) not done
-5) not done
+3) Done for 4 commands
+4) Done for 4 commands
+5) Done for 4 commands
