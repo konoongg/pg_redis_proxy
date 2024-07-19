@@ -29,7 +29,6 @@ close_connection(EV_P_ struct ev_io* io_handle) {
     free(io_handle);
 }
 
-
 bool
 socket_set_nonblock(int socket_fd){
     int flags = fcntl(socket_fd, F_GETFL, 0);
@@ -41,7 +40,6 @@ socket_set_nonblock(int socket_fd){
     }
     return true;
 }
-
 
 int
 write_data(int fd, char* mes, int count_sum){
@@ -175,7 +173,6 @@ replace_part_of_buffer(Tsocket_data* data, int cur_buffer_index){
     data->cur_buffer_size -=  cur_buffer_index;
     ereport(LOG, errmsg("REPLACE"));
 }
-
 
 /*
  * Retrieves string value from user request

@@ -19,7 +19,7 @@ process_get(char* key, char** pg_answer, int* size_pg_answer){
     int length_value = 0;
     req_result res = get_value(get_cur_table(), key, &value, &length_value);
     ereport(LOG, errmsg("START GET"));
-    if(res == non){
+    if(res == NON){
         ereport(LOG, errmsg("IN process_get: GET non key: %s",key));
         *pg_answer = (char*)malloc( sizeof(char));
         if(*pg_answer == NULL){
@@ -29,7 +29,7 @@ process_get(char* key, char** pg_answer, int* size_pg_answer){
         (*pg_answer)[0] = 3;
         *size_pg_answer = 1;
     }
-    else if(res == err){
+    else if(res == ERR_REQ){
         ereport(LOG, errmsg("IN process_get: GET err with key: %s", key));
         return -1;
     }
@@ -49,7 +49,7 @@ int
 process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
     req_result res = set_value(get_cur_table(), key, value);
     ereport(LOG, errmsg("START SET"));
-    if(res == err){
+    if(res == ERR_REQ){
         ereport(LOG, errmsg("IN process_set: SET err with key: %s value: %s", key, value));
         return -1;
     }

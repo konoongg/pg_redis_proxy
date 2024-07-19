@@ -10,6 +10,6 @@ struct proxy_status{
 } typedef proxy_status;
 
 int init_table(void);
-char check_table(char* new_table_name,  PGresult* res);
+bool check_table(char** tables_name, char* new_table_name,  int n_rows);
 char* get_cur_table(void);
 int init_proxy_status(void);
