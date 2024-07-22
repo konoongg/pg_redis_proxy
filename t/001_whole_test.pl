@@ -167,7 +167,7 @@ for (keys %other_tests) {
 for (keys %correct_resp_tests) {
 	$socket->send($_);
 	$socket->recv($response, 1024);
-	# print("Response: $response, Cur: $_, Hash: $correct_resp_tests{$_}\n");
+	# print("Response: $response, Cur: $_, Expected result: $correct_resp_tests{$_}\n");
 	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
 }
 

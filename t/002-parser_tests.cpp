@@ -1,3 +1,5 @@
+#define FRONTEND 1
+
 #include <exception>
 #include <string>
 #include <cstdlib>
