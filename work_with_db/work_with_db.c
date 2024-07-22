@@ -119,7 +119,6 @@ get_table_name(char*** tables_name, int* n_rows){
     return OK;
 }
 
-
 req_result
 create_table(char* new_table_name){
     char CREATE_TABLE[100];
@@ -136,6 +135,32 @@ create_table(char* new_table_name){
         PQfinish(conn);
         return ERR_REQ;
     }
+    return OK;
+}
+
+req_result
+del_value(char* table, char* key, int* count_del){
+    char DELETE[200];
+    if(!connected){
+        ereport(ERROR, errmsg("del_value: not connected with bd"));
+        return ERR_REQ;
+    }
+    ereport(LOG, errmsg("DELETE: %s", table));
+    if (sprintf(DELETE, "DELETE FROM %s  WHERE key= \'%s\'", table, key) < 0) {
+        ereport(ERROR, errmsg( "sprintf err"));
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
+    }
+    res = PQexec(conn, DELETE);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        ereport(ERROR, errmsg("select table failed: %s", PQerrorMessage(conn)));
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
+    }
+    *count_del = atoi(PQcmdTuples(res));
+    ereport(LOG, errmsg("DELETE: %d with KEY: %s", atoi(PQcmdTuples(res)), key));
     return OK;
 }
 

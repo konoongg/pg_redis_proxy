@@ -71,6 +71,28 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
 }
 
 /*
+ * accepts format 2<digit-written number>, 2 - code data
+ * */
+int
+CreateInt(char* reqv, char** answer, size_t size_reqv, int* size_answer){
+    int count_shell_sym = 3;
+    int size_reqv_data = size_reqv - 1;
+    *size_answer = size_reqv_data + count_shell_sym;
+    ereport(LOG, errmsg("START CreateInt: %s ", reqv));
+    *answer = (char*)malloc(*size_answer * sizeof(char));
+    if(*answer == NULL){
+        ereport(LOG, errmsg("ERROR MALLOC"));
+        return -1;
+    }
+    (*answer)[0] = ':';
+    memcpy(*answer + 1, reqv + 1, size_reqv_data);
+    (*answer)[(*size_answer)- 1] = '\n';
+    (*answer)[(*size_answer) - 2] = '\r';
+    ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
+    return 0;
+}
+
+/*
  * For Simple Strings the first byte of the reply is "+" (code  0)
  * For Errors the first byte of the reply is "-" (code  1)
  * For Integers the first byte of the reply is ":" (code  2)
@@ -88,7 +110,7 @@ define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         //CreateErr();
     }
     else if(reqv[0] == 2){
-        //CreateInt();
+        return CreateInt(reqv, answer, size_reqv, size_answer);
     }
     else if(reqv[0] == 3){
         return CreateStr(reqv, answer, size_reqv, size_answer);

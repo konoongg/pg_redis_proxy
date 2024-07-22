@@ -92,6 +92,7 @@ on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
             read_info->argv = NULL;
             read_info->argc = -1;
             read_info->parsing.parsing_str = NULL;
+            read_info->parsing.parsing_num = 0;
             read_info->exit_status = NOT_ALL;
         }
         parse_cli_mes(read_info);
@@ -166,6 +167,7 @@ on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     socket_data->read_data.argv = NULL;
     socket_data->read_data.exit_status = NOT_ALL;
     socket_data->read_data.parsing.parsing_str = NULL;
+    socket_data->read_data.parsing.parsing_num = 0;
     socket_data->write_data.answer = NULL;
     socket_data->write_data.size_answer = 0;
     read_io_handle->data = (void*)socket_data;
