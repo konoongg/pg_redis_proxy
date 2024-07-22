@@ -20,7 +20,8 @@ void
 close_connection(EV_P_ struct ev_io* io_handle) {
     Tsocket_data* data = (Tsocket_data*)io_handle->data;
     ereport(LOG, errmsg("FINISH CONNECTED: %d", io_handle->fd));
-    ev_io_stop(loop, io_handle);
+    ev_io_stop(loop, data->write_io_handle);
+    ev_io_stop(loop, data->read_io_handle);
     close(io_handle->fd);
     for(int i = 0; i < data->read_data.argc; ++i){
         ereport(LOG, errmsg("DATA: %s", data->read_data.argv[i]));
@@ -31,6 +32,7 @@ close_connection(EV_P_ struct ev_io* io_handle) {
     free(data->write_data.answer);
     free(data);
     free(io_handle);
+    ereport(LOG, errmsg("FULL FINISH CONNECTED: %d", io_handle->fd));
 }
 
 //create socket nonblock
@@ -216,7 +218,9 @@ int
 read_data(EV_P_ struct ev_io* io_handle, char* read_buffer, int cur_buffer_size){
     int res = read(io_handle->fd, read_buffer + cur_buffer_size, BUFFER_SIZE - cur_buffer_size);
     if (!res || res < 0) {
+        ereport(LOG, errmsg( "CLOS CONNCTION"));
         close_connection(loop, io_handle);
+        ereport(LOG, errmsg( "SUC CLOS CONNCTION"));
         return - 1;
     }
     return res;

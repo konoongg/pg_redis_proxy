@@ -43,7 +43,7 @@ on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     Tsocket_data* socket_data = (Tsocket_data*)io_handle->data;
     Tsocket_write_data* write_info = &(socket_data->write_data);
     ereport(LOG, errmsg("WRITE WORK %s %d", write_info->answer, write_info->size_answer));
-        byte_write = write_data(io_handle->fd,write_info->answer, write_info->size_answer);
+    byte_write = write_data(io_handle->fd,write_info->answer, write_info->size_answer);
     if(byte_write == -1){
         return;
     }
@@ -124,8 +124,9 @@ on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
             write_info->size_answer += size_rd_answer;
         }
     } while(read_info->cur_buffer_size != 0);
-    ereport(LOG, errmsg("answer: %s answer_size: %d", write_info->answer, write_info->size_answer));
+    ereport(LOG, errmsg("answer: %s answer_size: %d rd_answer: %s", write_info->answer, write_info->size_answer, rd_answer));
     if(write_info->size_answer > 0){
+        ereport(LOG, errmsg("EV_IO  wreti start"));
         ev_io_start(loop, write_io_handle);
     }
     free(pg_answer);
