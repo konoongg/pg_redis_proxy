@@ -15,7 +15,7 @@ struct proxy_status* proxy_configure;
 bool
 check_table(char** tables_name, char* new_table_name,  int n_rows){
     for (int i = 0; i < n_rows; i++) {
-        ereport(LOG, errmsg("%d: check Table name: %s and new table name: %s", i, tables_name[i], new_table_name));
+        //ereport(LOG, errmsg("%d: check Table name: %s and new table name: %s", i, tables_name[i], new_table_name));
         if(strcmp(tables_name[i], new_table_name) == 0){
             return true;
         }

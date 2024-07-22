@@ -8,6 +8,7 @@
 #include "utils/elog.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <signal.h>
 #include "postmaster/interrupt.h"
 #include "miscadmin.h"
@@ -35,52 +36,97 @@ static void register_proxy(void);
 static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
 static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 
+
+static void
+on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
+    int byte_write;
+    Tsocket_write_data* write_info = (Tsocket_write_data*)io_handle->data;
+    ereport(LOG, errmsg("WRITE WORK %s %d", write_info->answer, write_info->size_answer));
+        byte_write = write_data(io_handle->fd,write_info->answer, write_info->size_answer);
+    if(byte_write == -1){
+        return;
+    }
+    else if(byte_write == write_info->size_answer){
+        ereport(LOG, errmsg("WRITER STOP"));
+        ev_io_stop(loop, io_handle);
+        write_info->size_answer = 0;
+    }
+    else{
+        write_info->size_answer -= byte_write;
+        memcpy(write_info->answer, write_info->answer + byte_write, write_info->size_answer - byte_write);
+    }
+}
+
 static void
 on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
-    Tsocket_data* data;
+    Tsocket_data* read_info; // info about read from socket
+    Tsocket_write_data* write_info; // info about write on socket
+    ev_io* write_io_handle;
     ssize_t res = 0;
-    char* pg_answer;
-    char* rd_answer;
+    char* pg_answer = NULL;
+    char* rd_answer = NULL;
     int size_pg_answer = 0;
     int size_rd_answer = 0;
     if (error_event(revents)) {
         close_connection(loop, io_handle);
         return;
     }
-    data = (Tsocket_data*)io_handle->data;
-    res = read_data(loop, io_handle, data->read_buffer, data->cur_buffer_size);
-    ereport(LOG, errmsg("START MESSAGE PARSING %d",  data->cur_buffer_size));
+    read_info = (Tsocket_data*)io_handle->data;
+    write_io_handle = (ev_io*)read_info->write_io_handle;
+    ereport(LOG, errmsg("PTR %p fd: %d", write_io_handle, io_handle->fd));
+    write_info = (Tsocket_write_data*)write_io_handle->data;
+    ereport(LOG, errmsg("SAVED DATA %d", read_info->cur_buffer_size));
+    res = read_data(loop, io_handle, read_info->read_buffer, read_info->cur_buffer_size);
+    ereport(LOG, errmsg("START MESSAGE PARSING %d",  read_info->cur_buffer_size));
+    read_info->cur_buffer_size = res;
+    ereport(LOG, errmsg("RES: %ld", res));
     if(res == -1){
         return;
     }
-    if(data->exit_status == ALL){
-        data->read_status = ARRAY_WAIT;
-        for(int i = 0; i < data->argc; ++i){
-            free(data->argv[i]);
+    do{
+        if(read_info->exit_status == ALL){
+            read_info->read_status = ARRAY_WAIT;
+            for(int i = 0; i < read_info->argc; ++i){
+                free(read_info->argv[i]);
+            }
+            free(read_info->argv);
+            read_info->argv = NULL;
+            read_info->argc = -1;
+            read_info->parsing.parsing_str = NULL;
+            read_info->exit_status = NOT_ALL;
         }
-        free(data->argv);
-        data->argv = NULL;
-        data->argc = -1;
-        data->parsing.parsing_str = NULL;
-        data->exit_status = NOT_ALL;
-    }
-    data->cur_buffer_size += res;
-    ereport(LOG, errmsg("RES: %ld", res));
-    parse_cli_mes(data);
-    if(data->exit_status != ALL){
-        return;
-    }
-    if (process_redis_to_postgres(data->argc, data->argv, &pg_answer, &size_pg_answer) == -1){
-        ereport(ERROR, errmsg("process redis to postgres"));
-        return;
-    }
-    if (define_type_req(pg_answer, &rd_answer, size_pg_answer, &size_rd_answer) == -1){
+        parse_cli_mes(read_info);
+        if(read_info->exit_status != ALL){
+            break;
+        }
+        if (process_redis_to_postgres(read_info->argc, read_info->argv, &pg_answer, &size_pg_answer) == -1){
+            ereport(ERROR, errmsg("process redis to postgres"));
+            return;
+        }
+        ereport(LOG, errmsg("START PR CONVERT"));
+        if (define_type_req(pg_answer, &rd_answer, size_pg_answer, &size_rd_answer) == -1){
             ereport(ERROR, errmsg("can't translate pg_answer to rd_answer"));
             return;
-    }
-    if(write_data(io_handle->fd, rd_answer, size_rd_answer ) == -1){
-        ereport(ERROR, errmsg("can't write data on socket"));
-        return;
+        }
+        ereport(LOG, errmsg("START WRITE"));
+        if(write_info->answer == NULL){
+            write_info->answer = (char*)malloc(size_rd_answer * sizeof(char));
+            write_info->size_answer = size_rd_answer;
+            memcpy(write_info->answer,rd_answer,size_rd_answer);
+            if(write_info->answer == NULL){
+                ereport(ERROR, errmsg("can't malloc"));
+                return;
+            }
+        }
+        else{
+            write_info->answer = (char*)realloc(write_info->answer, write_info->size_answer + size_rd_answer * sizeof(char));
+            memcpy(write_info->answer + write_info->size_answer ,rd_answer,size_rd_answer);
+            write_info->size_answer += size_rd_answer;
+        }
+    } while(read_info->cur_buffer_size != 0);
+    ereport(LOG, errmsg("answer: %s answer_size: %d", write_info->answer, write_info->size_answer));
+    if(write_info->size_answer > 0){
+        ev_io_start(loop, write_io_handle);
     }
     free(pg_answer);
     free(rd_answer);
@@ -89,9 +135,17 @@ on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
 static void
 on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     int socket_fd = -1;
-    struct ev_io* client_io_handle;
-    Tsocket_data* data = (Tsocket_data*) malloc(sizeof(Tsocket_data));
-    if(data == NULL){
+    struct ev_io* read_io_handle;
+    struct ev_io* write_io_handle;
+    Tsocket_data* read_data;
+    Tsocket_write_data* write_data;
+    read_data = (Tsocket_data*) malloc(sizeof(Tsocket_data));
+    if(read_data == NULL){
+        ereport(ERROR, errmsg("CAN'T MALLOC"));
+        return;
+    }
+    write_data = (Tsocket_write_data*) malloc(sizeof(Tsocket_write_data));
+    if(write_data == NULL){
         ereport(ERROR, errmsg("CAN'T MALLOC"));
         return;
     }
@@ -99,21 +153,33 @@ on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     if(socket_fd == -1){
         return;
     }
-    client_io_handle = (struct ev_io*)malloc(sizeof(struct ev_io));
-    if (!client_io_handle) {
+    read_io_handle = (struct ev_io*)malloc(sizeof(struct ev_io));
+    if (!read_io_handle) {
         ereport(ERROR, errmsg( "CAN't CREATE CLIENT %d", socket_fd));
         close(socket_fd);
         return;
     }
-    data->read_status = ARRAY_WAIT;
-    data->cur_buffer_size = 0;
-    data->argc = -1;
-    data->argv = NULL;
-    data->exit_status = NOT_ALL;
-    data->parsing.parsing_str = NULL;
-    client_io_handle->data = (void*)data;
-    ev_io_init(client_io_handle, on_read_cb, socket_fd, EV_READ);
-    ev_io_start(loop, client_io_handle);
+    write_io_handle = (struct ev_io*)malloc(sizeof(struct ev_io));
+    if (!write_io_handle) {
+        ereport(ERROR, errmsg( "CAN't CREATE CLIENT %d", socket_fd));
+        close(socket_fd);
+        return;
+    }
+    read_data->read_status = ARRAY_WAIT;
+    read_data->cur_buffer_size = 0;
+    read_data->argc = -1;
+    read_data->argv = NULL;
+    read_data->exit_status = NOT_ALL;
+    read_data->parsing.parsing_str = NULL;
+    write_data->answer = NULL;
+    write_data->size_answer = 0;
+    read_io_handle->data = (void*)read_data;
+    write_io_handle->data = (void*)write_data;
+    read_data->write_io_handle = write_io_handle;
+    ev_io_init(read_io_handle, on_read_cb, socket_fd, EV_READ);
+    ev_io_start(loop, read_io_handle);
+    ev_io_init(write_io_handle, on_write_cb, socket_fd, EV_WRITE);
+    ereport(LOG, errmsg("PTR MAIN %p fd: %d", write_io_handle, socket_fd ));
 }
 
 void
