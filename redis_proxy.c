@@ -144,7 +144,7 @@ on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
         ereport(ERROR, errmsg("CAN'T MALLOC"));
         return;
     }
-    socket_fd = get_socket(loop, io_handle->fd);
+    socket_fd = get_socket(io_handle->fd);
     if(socket_fd == -1){
         return;
     }
