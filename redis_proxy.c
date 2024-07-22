@@ -16,6 +16,8 @@
 #include <netinet/in.h>
 #include <ev.h>
 #include <errno.h>
+#include "tcop/tcopprot.h"
+#include "miscadmin.h"
 
 #include "work_with_socket/work_with_socket.h"
 #include "redis_reqv_converter/redis_reqv_converter.h"
@@ -269,7 +271,11 @@ proxy_start_work(Datum main_arg){
     ev_io_init(accept_io_handle, on_accept_cb, listen_socket, EV_READ);
     ev_io_start(loop, accept_io_handle);
     ereport(LOG, errmsg("EV_IO START"));
+    pqsignal(SIGTERM, die);
+    pqsignal(SIGHUP, SignalHandlerForConfigReload);
+    BackgroundWorkerUnblockSignals();
     for(;;) {
+        CHECK_FOR_INTERRUPTS();
         ev_run(loop, EVRUN_ONCE);
     }
     finish_work_with_db();
