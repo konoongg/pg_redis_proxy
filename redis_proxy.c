@@ -40,7 +40,8 @@ static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 static void
 on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     int byte_write;
-    Tsocket_write_data* write_info = (Tsocket_write_data*)io_handle->data;
+    Tsocket_data* socket_data = (Tsocket_data*)io_handle->data;
+    Tsocket_write_data* write_info = &(socket_data->write_data);
     ereport(LOG, errmsg("WRITE WORK %s %d", write_info->answer, write_info->size_answer));
         byte_write = write_data(io_handle->fd,write_info->answer, write_info->size_answer);
     if(byte_write == -1){
@@ -59,8 +60,9 @@ on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
 
 static void
 on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
-    Tsocket_data* read_info; // info about read from socket
-    Tsocket_write_data* write_info; // info about write on socket
+    Tsocket_data* socket_data;
+    Tsocket_write_data* write_info;
+    Tsocket_read_data* read_info;
     ev_io* write_io_handle;
     ssize_t res = 0;
     char* pg_answer = NULL;
@@ -71,15 +73,12 @@ on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
         close_connection(loop, io_handle);
         return;
     }
-    read_info = (Tsocket_data*)io_handle->data;
-    write_io_handle = (ev_io*)read_info->write_io_handle;
-    ereport(LOG, errmsg("PTR %p fd: %d", write_io_handle, io_handle->fd));
-    write_info = (Tsocket_write_data*)write_io_handle->data;
-    ereport(LOG, errmsg("SAVED DATA %d", read_info->cur_buffer_size));
+    socket_data = (Tsocket_data*)io_handle->data;
+    write_io_handle = (ev_io*)socket_data->write_io_handle;
+    write_info = &(socket_data->write_data);
+    read_info = &(socket_data->read_data);
     res = read_data(loop, io_handle, read_info->read_buffer, read_info->cur_buffer_size);
-    ereport(LOG, errmsg("START MESSAGE PARSING %d",  read_info->cur_buffer_size));
     read_info->cur_buffer_size = res;
-    ereport(LOG, errmsg("RES: %ld", res));
     if(res == -1){
         return;
     }
@@ -137,15 +136,9 @@ on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     int socket_fd = -1;
     struct ev_io* read_io_handle;
     struct ev_io* write_io_handle;
-    Tsocket_data* read_data;
-    Tsocket_write_data* write_data;
-    read_data = (Tsocket_data*) malloc(sizeof(Tsocket_data));
-    if(read_data == NULL){
-        ereport(ERROR, errmsg("CAN'T MALLOC"));
-        return;
-    }
-    write_data = (Tsocket_write_data*) malloc(sizeof(Tsocket_write_data));
-    if(write_data == NULL){
+    Tsocket_data* socket_data;
+    socket_data = (Tsocket_data*)malloc(sizeof(Tsocket_data));
+    if(socket_data == NULL){
         ereport(ERROR, errmsg("CAN'T MALLOC"));
         return;
     }
@@ -165,17 +158,18 @@ on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
         close(socket_fd);
         return;
     }
-    read_data->read_status = ARRAY_WAIT;
-    read_data->cur_buffer_size = 0;
-    read_data->argc = -1;
-    read_data->argv = NULL;
-    read_data->exit_status = NOT_ALL;
-    read_data->parsing.parsing_str = NULL;
-    write_data->answer = NULL;
-    write_data->size_answer = 0;
-    read_io_handle->data = (void*)read_data;
-    write_io_handle->data = (void*)write_data;
-    read_data->write_io_handle = write_io_handle;
+    socket_data->write_io_handle = write_io_handle;
+    socket_data->read_io_handle = read_io_handle;
+    socket_data->read_data.read_status = ARRAY_WAIT;
+    socket_data->read_data.cur_buffer_size = 0;
+    socket_data->read_data.argc = -1;
+    socket_data->read_data.argv = NULL;
+    socket_data->read_data.exit_status = NOT_ALL;
+    socket_data->read_data.parsing.parsing_str = NULL;
+    socket_data->write_data.answer = NULL;
+    socket_data->write_data.size_answer = 0;
+    read_io_handle->data = (void*)socket_data;
+    write_io_handle->data = (void*)socket_data;
     ev_io_init(read_io_handle, on_read_cb, socket_fd, EV_READ);
     ev_io_start(loop, read_io_handle);
     ev_io_init(write_io_handle, on_write_cb, socket_fd, EV_WRITE);

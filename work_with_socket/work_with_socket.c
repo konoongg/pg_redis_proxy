@@ -21,12 +21,13 @@ close_connection(EV_P_ struct ev_io* io_handle) {
     Tsocket_data* data = (Tsocket_data*)io_handle->data;
     ev_io_stop(loop, io_handle);
     close(io_handle->fd);
-    for(int i = 0; i < data->argc; ++i){
-        free(data->argv[i]);
+    for(int i = 0; i < data->read_data.argc; ++i){
+        free(data->read_data.argv[i]);
     }
     close(io_handle->fd);
-    free(data->argv);
-    free(data->parsing.parsing_str);
+    free(data->read_data.argv);
+    free(data->read_data.parsing.parsing_str);
+    free(data->write_data.answer);
     free(data);
     free(io_handle);
 }
@@ -63,7 +64,7 @@ write_data(int fd, char* mes, int count_sum){
  * performs the necessary actions
  */
 void
-parse_cli_mes(Tsocket_data* data){
+parse_cli_mes(Tsocket_read_data* data){
     int cur_buffer_index = 0;
     ereport(LOG, errmsg("SIZE: %d", data->cur_buffer_size));
     while(1){
@@ -173,7 +174,7 @@ parse_cli_mes(Tsocket_data* data){
 
 // saves data to a buffer if more than one packet has been written off
 void
-replace_part_of_buffer(Tsocket_data* data, int cur_buffer_index){
+replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index){
     ereport(LOG, errmsg("ARGC final1: %d cur_buffer_size: %d", data->argc, data->cur_buffer_size));
     memmove(data->read_buffer, data->read_buffer + cur_buffer_index, data->cur_buffer_size - cur_buffer_index);
     data->cur_buffer_size -=  cur_buffer_index;

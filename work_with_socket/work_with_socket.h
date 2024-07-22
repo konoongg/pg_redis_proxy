@@ -35,8 +35,14 @@ struct Tsocket_parsing{
     int cur_size_str;
 } typedef  Tsocket_parsing;
 
-// struct with ev_io READ
-struct Tsocket_data{
+// struct with ev_io WRITE
+struct Tsocket_write_data{
+    char* answer;
+    int size_answer;
+} typedef Tsocket_write_data;
+
+// struct with ev_io read
+struct Tsocket_read_data{
     char** argv;
     int argc;
     int cur_count_argv;
@@ -45,19 +51,19 @@ struct Tsocket_data{
     char read_buffer[BUFFER_SIZE];
     Eread_status read_status;
     Eexit_status exit_status;
+} typedef Tsocket_read_data;
+
+// struct with connect
+struct Tsocket_data{
+    Tsocket_write_data write_data;
+    Tsocket_read_data read_data;
     struct ev_io* write_io_handle;
+    struct ev_io* read_io_handle;
 } typedef Tsocket_data;
 
 
-// struct with ev_io WRITE
-struct Tsocket_write_data{
-    char* answer;
-    int size_answer;
-} typedef Tsocket_write_data;
-
-
-void parse_cli_mes(Tsocket_data* data);
-void replace_part_of_buffer(Tsocket_data* data, int cur_buffer_index);
+void parse_cli_mes(Tsocket_read_data* data);
+void replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index);
 int write_data(int fd, char* mes, int count_sum);
 bool socket_set_nonblock(int socket_fd);
 void close_connection(EV_P_ struct ev_io *io_handle);
