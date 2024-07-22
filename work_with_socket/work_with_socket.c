@@ -19,14 +19,15 @@ char read_buffer[BUFFER_SIZE];
 void
 close_connection(EV_P_ struct ev_io* io_handle) {
     Tsocket_data* data = (Tsocket_data*)io_handle->data;
+    ereport(LOG, errmsg("FINISH CONNECTED: %d", io_handle->fd));
     ev_io_stop(loop, io_handle);
     close(io_handle->fd);
     for(int i = 0; i < data->read_data.argc; ++i){
+        ereport(LOG, errmsg("DATA: %s", data->read_data.argv[i]));
         free(data->read_data.argv[i]);
     }
     close(io_handle->fd);
     free(data->read_data.argv);
-    free(data->read_data.parsing.parsing_str);
     free(data->write_data.answer);
     free(data);
     free(io_handle);
@@ -77,6 +78,7 @@ parse_cli_mes(Tsocket_read_data* data){
         }
         else if(((c >= '0' && c <= '9') || c == '-') && data->read_status == NUM_OR_MINUS_WAIT){
             if(c >= '0' && c <= '9'){
+                ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
                 data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
                 data->parsing.is_negative = false;
             }
@@ -86,13 +88,14 @@ parse_cli_mes(Tsocket_read_data* data){
             data->read_status = NUM_WAIT;
         }
         else if(c >= '0' && c <= '9' && data->read_status == NUM_WAIT){
+            ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
             data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
         }
         else if(c == '\r' && data->read_status == NUM_WAIT){
             if(data->parsing.is_negative){
                 data->parsing.parsing_num *= -1;
             }
-            ereport(LOG, errmsg("NUM: %d",data->parsing.parsing_num ));
+            ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
             if(data->argc == -1){
                 data->argc = data->parsing.parsing_num;
                 ereport(LOG, errmsg("ARGC: %d", data->argc));
@@ -109,6 +112,7 @@ parse_cli_mes(Tsocket_read_data* data){
                 data->parsing.size_str = data->parsing.parsing_num;
                 data->parsing.cur_size_str = 0;
                 data->parsing.parsing_str = (char*)malloc((data->parsing.size_str + 1)  * sizeof(char));
+                ereport(LOG, errmsg(" DATA parsing_str: %p", data->parsing.parsing_str));
                 data->read_status = STRING_WAIT;
                 if(data->parsing.parsing_str == NULL){
                     ereport(ERROR, errmsg("CAN'T MALLOC"));
