@@ -9,6 +9,7 @@
 // parsers status
 enum Eread_status {
     ARRAY_WAIT,
+    NUM_OR_MINUS_WAIT, // first sym of num can be minus
     NUM_WAIT,
     STRING_WAIT, // wait \n before string size
     START_STRING_WAIT, //wait $
@@ -28,6 +29,7 @@ enum Eexit_status {
 
 struct Tsocket_parsing{
     int parsing_num;
+    bool is_negative;
     char* parsing_str;
     int size_str;
     int cur_size_str;

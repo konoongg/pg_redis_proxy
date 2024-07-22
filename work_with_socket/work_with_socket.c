@@ -72,16 +72,25 @@ parse_cli_mes(Tsocket_data* data){
         //ereport(LOG, errmsg("SYM %c %d ", c, c));
         if(c == '*' && data->read_status == ARRAY_WAIT){
             ereport(LOG, errmsg("START PARS INT"));
+            data->read_status = NUM_OR_MINUS_WAIT;
+        }
+        else if(((c >= '0' && c <= '9') || c == '-') && data->read_status == NUM_OR_MINUS_WAIT){
+            if(c >= '0' && c <= '9'){
+                data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
+                data->parsing.is_negative = false;
+            }
+            else if(c == '-'){
+                data->parsing.is_negative = true;
+            }
             data->read_status = NUM_WAIT;
         }
         else if(c >= '0' && c <= '9' && data->read_status == NUM_WAIT){
-            //ereport(LOG, errmsg("SYM NUM : %c %d", c, c));
-            if(data->read_status != NUM_WAIT){
-                return;
-            }
             data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
         }
         else if(c == '\r' && data->read_status == NUM_WAIT){
+            if(data->parsing.is_negative){
+                data->parsing.parsing_num *= -1;
+            }
             ereport(LOG, errmsg("NUM: %d",data->parsing.parsing_num ));
             if(data->argc == -1){
                 data->argc = data->parsing.parsing_num;
@@ -115,7 +124,7 @@ parse_cli_mes(Tsocket_data* data){
             data->read_status = STR_SYM_WAIT;
         }
         else if(c == '$' && data->read_status == START_STRING_WAIT){
-            data->read_status = NUM_WAIT;
+            data->read_status = NUM_OR_MINUS_WAIT;
         }
         else if(data->read_status == STR_SYM_WAIT){
             data->parsing.parsing_str[data->parsing.cur_size_str] = c;
