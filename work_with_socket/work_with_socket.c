@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <ev.h>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
 
 #include "work_with_socket.h"
 
@@ -200,6 +202,7 @@ replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index){
 int
 get_socket(int fd){
     int socket_fd = accept(fd, NULL, NULL);
+    int opt;
     ereport(LOG, errmsg( "ACCEPT: %d", socket_fd));
     if (socket_fd == -1) {
         char* err = strerror(errno);
@@ -207,6 +210,19 @@ get_socket(int fd){
         return -1;
     }
     if (!socket_set_nonblock(fd)) {
+        close(socket_fd);
+        return -1;
+    }
+    opt = 1;
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        char* err  =  strerror(errno);
+        ereport(ERROR, errmsg("socket(): %s", err));
+        close(socket_fd);
+        return -1;
+    }
+    if (setsockopt(socket_fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0) {
+        char* err = strerror(errno);
+        fprintf(stderr, "setsockopt TCP_NODELAY: %s\n", err);
         close(socket_fd);
         return -1;
     }
