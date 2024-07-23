@@ -5,7 +5,7 @@ import threading
 from queue import Queue
 import time
 
-def connect_to_port(host, port, thread_num, queue):
+def worker(host, port, thread_num, queue):
     try:
         start_time = time.time()
         count_work = 0
@@ -30,7 +30,7 @@ def connect_to_port(host, port, thread_num, queue):
         s.connect((host, port))
         s.send(delete_req.encode())
         s.close()
-        print(f"Успешное подключение к {host}:{port}")
+        print(f"suc connection to {host}:{port}")
         while(time.time() - start_time < 60):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(5)
@@ -51,7 +51,7 @@ def connect_to_port(host, port, thread_num, queue):
             s.close()
             count_work +=1
     except Exception as e:
-        print(f"Ошибка при подключении к {host}:{port}: {e}")
+        print(f"error connection to  {host}:{port}: {e}")
     finally:
         queue.put(count_work)
 
@@ -63,7 +63,7 @@ def main():
     threads = []
     queue = Queue()
     for i in range(num_connections):
-        thread = threading.Thread(target=connect_to_port, args=(host, port, i, queue))
+        thread = threading.Thread(target=worker, args=(host, port, i, queue))
         threads.append(thread)
         thread.start()
     for thread in threads:

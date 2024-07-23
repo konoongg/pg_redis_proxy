@@ -125,10 +125,10 @@ process_ping(char** pg_answer, int* size_pg_answer){
     }
     *size_pg_answer = 6;
     (*pg_answer)[0] = 0;
-    (*pg_answer)[1] = 'p';
-    (*pg_answer)[2] = 'o';
-    (*pg_answer)[3] = 'n';
-    (*pg_answer)[4] = 'g';
+    (*pg_answer)[1] = 'P';
+    (*pg_answer)[2] = 'O';
+    (*pg_answer)[3] = 'N';
+    (*pg_answer)[4] = 'G';
     (*pg_answer)[5] = '\0';
     return 0;
 }
