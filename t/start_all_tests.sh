@@ -8,4 +8,4 @@ go run 003-load_test_.go
 echo "004-load_test.py - creates 100 connections, each of which does connect, set, get, del, disconnect  and wait one second in a loopt"
 ./004-load_test.py
 echo "005-load_test_.go - creates 100 connections, each of which does set, get, del in a loop, and do connect and disconnect not in a loop"
-./005-load_test_.py
+./005-load_test_.go

@@ -82,7 +82,7 @@ func main(){
             for {
                 select {
                     case <-timeout:
-                        fmt.Printf("Thread %d: Timed out after %d seconds\n", threadID, time_wait)
+			 // fmt.Printf("Thread %d: Timed out after %d seconds\n", threadID, time_wait)
                         return
                     default:
                         conn, err := net.Dial("tcp", "localhost:6379")

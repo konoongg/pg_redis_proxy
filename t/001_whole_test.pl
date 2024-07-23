@@ -28,10 +28,19 @@ my $length = -1;
 
 # all tests in these hashes store test like this:
 # name_test[request_to_redis_db] => redis_response
-my %set_tests = (
-	"*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n" => "+OK\r\n",
-	"*4\r\n\$3\r\nset\r\n\$5\r\nabcde\r\n\$5\r\nefghi\r\n\$5\r\n12345\r\n" => "-ERR syntax error\r\n",
+# my %set_tests = (
+# 	"*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n" => "+OK\r\n",
+# 	"*4\r\n\$3\r\nset\r\n\$5\r\nabcde\r\n\$5\r\nefghi\r\n\$5\r\n12345\r\n" => "-ERR syntax error\r\n",
+# );
+
+my @set_tests = (
+	["*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n", "+OK\r\n", "Basic set test"],
+	["*4\r\n\$3\r\nset\r\n\$5\r\nabcde\r\n\$5\r\nefghi\r\n\$5\r\n12345\r\n", "-ERR syntax error\r\n", "Filling set with incorrect amount of values"],
 );
+
+# add: set key val1
+# set key val2
+# get key
 
 my %del_tests = (
 	"*3\r\n\$3\r\ndel\r\n\$4\r\nkey1\r\n\$4\r\nkey2\r\n" => ":2\r\n",
@@ -72,21 +81,44 @@ my %correct_resp_tests = (
 ####################################################################################################################################################################################
 
 #1, 2
-for (keys %set_tests) {
+for (my $i = 0; $i <= $#set_tests; $i++) {
     $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
     $socket->send($request);
     $socket->recv($response, 1024);
 
-	$socket->send($_);
+	$socket->send($set_tests[$i][0]);
 	$socket->recv($response, 1024);
 	# print("Response: $response, Cur: $_, Hash: $other_tests{$_}\n");
-	ok($response eq $set_tests{$_}, "Set test");
+	ok($response eq $set_tests[$i][1], $set_tests[$i][2]);
 }
+
+# 3 Update test: putting 2 values and then looking if the latest value is in key
+$request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+# print $response;
+
+$socket->send("*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$6\r\nvalue1\r\n");
+$socket->recv($response, 1024);
+
+# print $response;
+
+$socket->send("*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$6\r\nvalue2\r\n");
+$socket->recv($response, 1024);
+
+# print $response;
+
+$socket->send("*2\r\n\$3\r\nget\r\n\$3\r\nkey\r\n");
+$socket->recv($response, 1024);
+
+ok($response eq "\$6\r\nvalue2\r\n", "Update test");
+
 
 ####################################################################################################################################################################################
 # Block 1.2: get tests
 ####################################################################################################################################################################################
-#3
+#4
 # checking its work:
 $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
 $socket->send($request);
@@ -102,7 +134,7 @@ $socket->recv($response, 1024);
 ok($response eq "\$5\r\nvalue\r\n", "Get test: get works");
 ####################################################################################################################################################################################
 
-#4
+#5
 #pasring two reqv
 $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
 $socket->send($request);
@@ -118,7 +150,7 @@ $socket->recv($response, 1024);
 ok($response eq "\$5\r\nvalue\r\n\$5\r\nvalue\r\n", "Get test: get two response");
 ####################################################################################################################################################################################
 
-#5
+#6
 #del one test
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_test\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
@@ -130,7 +162,7 @@ $socket->recv($response, 1024);
 ok($response eq ":1\r\n", "DEL test: del one");
 ####################################################################################################################################################################################
 
-#6
+#7
 #del not exist
 $request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
@@ -142,7 +174,7 @@ $socket->recv($response, 1024);
 ok($response eq ":0\r\n", "DEL test: not exist");
 ######################################################################################################################################################################################
 
-#7
+#8
 #del two
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
 $socket->send($request);
@@ -158,7 +190,7 @@ $socket->recv($response, 1024);
 ok($response eq ":2\r\n", "DEL test: del two");
 #########################################################################################################################################################################################
 
-#8
+#9
 #del one of two (fisrst)
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
 $socket->send($request);
@@ -178,7 +210,7 @@ $socket->recv($response, 1024);
 ok($response eq ":1\r\n", "DEL test: del one of two (first)");
 ###########################################################################################################################################################################################
 
-#9
+#10
 #del one of two (second)
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
 $socket->send($request);
@@ -279,12 +311,12 @@ ok($response eq ":1\r\n", "DEL test: del one of two (second)");
 
 # Block 3.2: correct according to RESP protocol, but still must cause errors
 
-#for (keys %correct_resp_tests) {
-#	$socket->send($_);
-#	$socket->recv($response, 1024);
-#	print("Response: $response, Cur: $_, Hash: $correct_resp_tests{$_}\n");
-#	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
-#}
+# for (keys %correct_resp_tests) {
+# 	$socket->send($_);
+# 	$socket->recv($response, 1024);
+# 	# print("Response: $response, Cur: $_, Expected result: $correct_resp_tests{$_}\n");
+# 	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
+# }
 
 # Block 4: misc
 

@@ -30,7 +30,7 @@ def worker(host, port, thread_num, queue):
         s.connect((host, port))
         s.send(delete_req.encode())
         s.close()
-        print(f"suc connection to {host}:{port}")
+        # print(f"suc connection to {host}:{port}")
         while(time.time() - start_time < 60):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(5)

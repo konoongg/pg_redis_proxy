@@ -50,9 +50,8 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         count_shell_sym = 1 + count_write_sym + 2 + 2;  // 1 - $; count_write_sym - size; 2 - /r/n after size; 2 = /r/n after data;
     }
     *size_answer = size_reqv_data + count_shell_sym;
-    ereport(LOG, errmsg("size_reqv_data: %ld, count_shell_sym: %d *size_answer: %d %p", size_reqv_data, count_shell_sym, *size_answer, *answer));
+    ereport(LOG, errmsg("size_reqv_data: %ld, count_shell_sym: %d", size_reqv_data, count_shell_sym));
     *answer = (char*)malloc(*size_answer * sizeof(char));
-    ereport(LOG, errmsg("SUC MALLOC"));
     if(*answer == NULL){
         ereport(LOG, errmsg("ERROR MALLOC"));
         return -1;
@@ -67,14 +66,11 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         (*answer)[(*size_answer)- 1] = '\n';
         (*answer)[(*size_answer) - 2] = '\r';
     }
+    ereport(LOG, errmsg("RESULT CreateStr: %s ", *answer));
     return 0;
 }
 
-/*
- * accepts format 2<digit-written number>, 2 - code data
- * */
-int
-CreateInt(char* reqv, char** answer, size_t size_reqv, int* size_answer){
+int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 1;
     *size_answer = size_reqv_data + count_shell_sym;
@@ -97,7 +93,7 @@ CreateInt(char* reqv, char** answer, size_t size_reqv, int* size_answer){
  * For Errors the first byte of the reply is "-" (code  1)
  * For Integers the first byte of the reply is ":" (code  2)
  * For Bulk Strings the first byte of the reply is "$" (code  3)
- * For Arrays the first byte of the reply is "*" (code  4)
+ *  For Arrays the first byte of the reply is "*" (code  4)
  * The first byte is the response code, followed by the response from Postgres
  */
 int

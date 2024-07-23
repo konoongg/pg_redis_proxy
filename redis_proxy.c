@@ -206,8 +206,10 @@ proxy_start_work(Datum main_arg){
     int opt;
     struct sockaddr_in sockaddr;
     struct ev_loop* loop;
+
+    ProxyConfiguration config = init_configuration();
     ereport(LOG, errmsg("START WORKER RF"));
-    if(init_table() == -1){
+    if(init_table(config) == -1){
         ereport(ERROR, errmsg("can't init tables"));
         return;
     }
