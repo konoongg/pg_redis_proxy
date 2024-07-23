@@ -139,7 +139,7 @@ create_table(char* new_table_name){
 }
 
 req_result
-del_value(char* table, char* key, int* count_del){
+del_value(char* table, char* key){
     char DELETE[200];
     if(!connected){
         ereport(ERROR, errmsg("del_value: not connected with bd"));
@@ -159,7 +159,9 @@ del_value(char* table, char* key, int* count_del){
         PQfinish(conn);
         return ERR_REQ;
     }
-    *count_del = atoi(PQcmdTuples(res));
+    if(atoi(PQcmdTuples(res)) == 0){
+        return  NON;
+    }
     ereport(LOG, errmsg("DELETE: %d with KEY: %s", atoi(PQcmdTuples(res)), key));
     return OK;
 }

@@ -1,7 +1,17 @@
 # Tests.
 How to make them work?
-To make perl TAP tests work (its 001-whole_test.pl), you just need Perl interpreter
+1) To make perl TAP tests work (its 001-whole_test.pl), you just need Perl interpreter
 
-To make python load tests work (its 002-load_test.py and 004-load_test.py), you just need python interpreter
+2) To make python load tests work (its 002-load_test.py and 004-load_test.py), you just need python interpreter
 
-To make go load tests work(its 003-load_test_.go), you just need go compiler
+3) To make go load tests work(its 003-load_test_.go its 005-load_test_.go), you just need go compiler
+
+
+## about tests
+
+1) 001-whole_test.pl - tap tests, checks that the program is working correctly
+2) 002-load_test.py - creates 100 connections, each of which does connect, set, get, del, disconnect in a loop
+3) 003-load_test_.go - creates 100 connections, each of which does connect, set, get, del, disconnect in a loop
+4) 004-load_test.py - creates 100 connections, each of which does connect, set, get, del, disconnect  and wait one second in a loop 
+5) 005-load_test_.go - creates 100 connections, each of which does set, get, del in a loop, and do connect and disconnect
+   not in a loop

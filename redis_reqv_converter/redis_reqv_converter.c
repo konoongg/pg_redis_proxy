@@ -59,13 +59,14 @@ process_del(int command_argc, char** command_argv, char** pg_answer, int* size_p
     char num[20];
     ereport(LOG, errmsg("FINISH DEL"));
     for(int i = 1; i < command_argc; ++i){
-        int result;
-        req_result res = del_value(get_cur_table(), command_argv[i], &result);
+        req_result res = del_value(get_cur_table(), command_argv[i]);
         if(res == ERR_REQ){
             ereport(LOG, errmsg("IN process_get: DEL err with key: %s", command_argv[i]));
             return -1;
         }
-        count_del += result;
+        else if(res == OK){
+            count_del++;
+        }
     }
     count_write_sym = sprintf(num, "%d", count_del);
     if (count_write_sym < 0) {

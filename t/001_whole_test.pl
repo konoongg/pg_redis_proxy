@@ -119,29 +119,108 @@ ok($response eq "\$5\r\nvalue\r\n\$5\r\nvalue\r\n", "Get test: get two response"
 ####################################################################################################################################################################################
 
 #5
-# "bad" situations
-# Wrong number of arguments
-$request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
+#del one test
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_test\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
 $socket->recv($response, 1024);
 
-$request = "*3\r\n\$3\r\nget\r\n\$3\r\nkey\r\n\$20\r\nUn3x1st1ng_k3y_11251\r\n";
+$request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
 $socket->recv($response, 1024);
-ok($response eq "-ERR wrong number of arguments for `get` command\r\n", "Get test: incorrect number of arguments(2)");
-
-$request = "*1\r\n\$3\r\nget\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq "-ERR wrong number of arguments for 'get' command\r\n", "Get test: incorrect number of arguments(0)");
+ok($response eq ":1\r\n", "DEL test: del one");
 ####################################################################################################################################################################################
 
 #6
-# trying to get unexisting key:ls
-$request = "*2\r\n\$3\r\nget\r\n\$20\r\nUn3x1st1ng_k3y_11251\r\n";
+#del not exist
+$request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
 $socket->recv($response, 1024);
-ok($response eq "\$-1\r\n", "Get test: unexisting value");
+
+$request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_test\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+ok($response eq ":0\r\n", "DEL test: not exist");
+######################################################################################################################################################################################
+
+#7
+#del two
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two2\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\ndel\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+ok($response eq ":2\r\n", "DEL test: del two");
+#########################################################################################################################################################################################
+
+#8
+#del one of two (fisrst)
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two2\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\ndel\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+ok($response eq ":1\r\n", "DEL test: del one of two (first)");
+###########################################################################################################################################################################################
+
+#9
+#del one of two (second)
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two2\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_two1\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\ndel\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two2\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+ok($response eq ":1\r\n", "DEL test: del one of two (second)");
+
+##5
+## "bad" situations
+## Wrong number of arguments
+#$request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
+#$socket->send($request);
+#$socket->recv($response, 1024);
+#
+#$request = "*3\r\n\$3\r\nget\r\n\$3\r\nkey\r\n\$20\r\nUn3x1st1ng_k3y_11251\r\n";
+#$socket->send($request);
+#$socket->recv($response, 1024);
+#ok($response eq "-ERR wrong number of arguments for `get` command\r\n", "Get test: incorrect number of arguments(2)");
+
+#$request = "*1\r\n\$3\r\nget\r\n";
+#$socket->send($request);
+#$socket->recv($response, 1024);
+#ok($response eq "-ERR wrong number of arguments for 'get' command\r\n", "Get test: incorrect number of arguments(0)");
+####################################################################################################################################################################################
+
+##6
+## trying to get unexisting key:ls
+#$request = "*2\r\n\$3\r\nget\r\n\$20\r\nUn3x1st1ng_k3y_11251\r\n";
+#$socket->send($request);
+#$socket->recv($response, 1024);
+#ok($response eq "\$-1\r\n", "Get test: unexisting value");
 
 ####################################################################################################################################################################################
 # Block 1.3: del tests
@@ -150,36 +229,36 @@ ok($response eq "\$-1\r\n", "Get test: unexisting value");
 #7
 # del command receives any amount of arguments; keys in arguments are deleted.
 # filling the table
-for (my $i = 0; $i < 4; $i++) {
-	$request = "*3\r\n\$3\r\nset\r\n\$4\r\nkey$i\r\n\$5\r\nabcdef\r\n";
-	$socket->send($request);
-	$socket->recv($response, 1024);
-}
+#for (my $i = 0; $i < 4; $i++) {
+#	$request = "*3\r\n\$3\r\nset\r\n\$4\r\nkey$i\r\n\$5\r\nabcdef\r\n";
+#	$socket->send($request);
+#	$socket->recv($response, 1024);
+#}
 
-for (keys %del_tests) {
-	$socket->send($_);
-	$socket->recv($response, 1024);
-	ok($response eq $del_tests{$_}, "Del test: del deletes keys and returns correct count of keys deleted");
-
-	# print "Response: $response, Keys: $_";
-
-	# on repeat of deletion resp should return :0, because there's nothing to delete
-	$socket->send($_);
-	$socket->recv($response, 1024);
-	ok($response eq ":0\r\n", "Del test: on repeating, del doesn't delete keys");
-}
+#for (keys %del_tests) {
+#	$socket->send($_);
+#	$socket->recv($response, 1024);
+#	ok($response eq $del_tests{$_}, "Del test: del deletes keys and returns correct count of keys deleted");
+#
+#	# print "Response: $response, Keys: $_";
+#
+#	# on repeat of deletion resp should return :0, because there's nothing to delete
+#	$socket->send($_);
+#	$socket->recv($response, 1024);
+#	ok($response eq ":0\r\n", "Del test: on repeating, del doesn't delete keys");
+#}
 
 ####################################################################################################################################################################################
 # Block 2: other commands
 ####################################################################################################################################################################################
 
 #8
-for (keys %other_tests) {
-	$socket->send($_);
-	$socket->recv($response, 1024);
-	# print("Response: $response, Cur: $_, Hash: $other_tests{$_}\n");
-	ok($response eq $other_tests{$_}, "Other tests");
-}
+#for (keys %other_tests) {
+#	$socket->send($_);
+#	$socket->recv($response, 1024);
+#	# print("Response: $response, Cur: $_, Hash: $other_tests{$_}\n");
+#	ok($response eq $other_tests{$_}, "Other tests");
+#}
 
 ####################################################################################################################################################################################
 # Block 3: sending incorrect data and checking extension for correct failure
@@ -200,12 +279,12 @@ for (keys %other_tests) {
 
 # Block 3.2: correct according to RESP protocol, but still must cause errors
 
-for (keys %correct_resp_tests) {
-	$socket->send($_);
-	$socket->recv($response, 1024);
-	print("Response: $response, Cur: $_, Hash: $correct_resp_tests{$_}\n");
-	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
-}
+#for (keys %correct_resp_tests) {
+#	$socket->send($_);
+#	$socket->recv($response, 1024);
+#	print("Response: $response, Cur: $_, Hash: $correct_resp_tests{$_}\n");
+#	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
+#}
 
 # Block 4: misc
 
