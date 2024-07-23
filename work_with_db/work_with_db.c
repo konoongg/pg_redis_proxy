@@ -88,12 +88,6 @@ set_value(char* table, char* key, char* value){
         return ERR_REQ;
     }
     ereport(LOG, errmsg("INSERT: %s", table));
-    // if (sprintf(INSERT, "INSERT INTO %s (key, value) VALUES (\'%s\', \'%s\')", table, key, value) < 0) {
-    //     ereport(ERROR, errmsg( "sprintf err"));
-    //     PQclear(res);
-    //     PQfinish(conn);
-    //     return ERR_REQ;
-    // }
     if (sprintf (INSERT, "UPDATE %s SET h['%s']='%s'", table, key, value) < 0) {
         ereport (ERROR, errmsg ("sprintf err"));
         PQclear(res);
@@ -103,11 +97,75 @@ set_value(char* table, char* key, char* value){
 
     res = PQexec(conn, INSERT);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        ereport(ERROR, errmsg("Setting element in hstore failed failed: %s", PQerrorMessage(conn)));
+        ereport(ERROR, errmsg("Setting element in hstore failed: %s", PQerrorMessage(conn)));
         PQclear(res);
         PQfinish(conn);
         return ERR_REQ;
     }
+    return OK;
+}
+
+// deletes one key from table
+// should return NON if no keys were deleted
+req_result
+del_value(char* table, char* key) {     
+    char FIND[200];
+    char DELETE[200];
+    int n_rows;
+
+    ereport(LOG, errmsg("del_value: entered function"));
+
+    if (!connected) {
+        ereport(ERROR, errmsg("del_value: not connected with db"));
+        return ERR_REQ;
+    }
+    
+    // ===== Filling FIND && DELETE with needed requests =====
+    if (sprintf(DELETE, "UPDATE %s SET h = delete(h, '%s')", table, key) < 0) {
+        ereport(ERROR, errmsg ("sprintf err"));
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
+    }
+
+    ereport(LOG, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
+
+    if (sprintf(FIND, "SELECT exist(h, '%s') FROM %s;", key, table) < 0) {
+        ereport(ERROR, errmsg("spritnf err"));
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
+    }
+
+    // ===== Filling ended, execution starts =====
+    res = PQexec(conn, FIND);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        ereport (ERROR, errmsg("FINDING ELEMENT IN HSTORE FAILED"));
+        PQclear(res);
+        PQfinish(conn); 
+        return ERR_REQ;
+    }
+
+    n_rows = PQntuples(res);
+    if (n_rows != 1) {
+        ereport(ERROR, errmsg("Incorrect result of exist(h, 'key') command"));
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
+    }
+
+    ereport(LOG, errmsg("Received info on '%s' key existence, answer: %s size: %d", key, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
+    if (!strcmp(PQgetvalue(res, 0, 0), "f"))
+        return NON;
+
+    res = PQexec(conn, DELETE);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        ereport (ERROR, errmsg("Deleting element in hstore failed: %s", PQerrorMessage(conn)));
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
+    }
+
     return OK;
 }
 

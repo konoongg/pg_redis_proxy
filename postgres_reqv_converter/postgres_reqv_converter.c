@@ -70,6 +70,18 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     return 0;
 }
 
+int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
+    ereport(LOG, errmsg("START CreateStr: %s %ld ", reqv, size_reqv));
+
+    (*answer)[0] = ':';
+    (*answer)[1] = reqv[1];
+    (*answer)[2] = '\n';
+    (*answer)[3] = '\r';
+
+    ereport(LOG, errmsg("RESULT CreateStr: %s ", *answer));
+    return 0;
+}
+
 /*
  * For Simple Strings the first byte of the reply is "+" (code  0)
  * For Errors the first byte of the reply is "-" (code  1)
@@ -88,7 +100,7 @@ define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         //CreateErr();
     }
     else if(reqv[0] == 2){
-        //CreateInt();
+        return CreateInt(reqv, answer, size_reqv, size_answer);
     }
     else if(reqv[0] == 3){
         return CreateStr(reqv, answer, size_reqv, size_answer);

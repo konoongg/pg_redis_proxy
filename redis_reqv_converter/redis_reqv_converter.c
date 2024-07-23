@@ -73,6 +73,41 @@ process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
 }
 
 int
+process_del(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
+    int successful_deletions = 0;
+    req_result res;
+
+    ereport (LOG, errmsg("START DEL, %d arguments", command_argc));
+    
+    // 0'th arg is "DEL", its ignored.
+    for (int i = 1; i < command_argc; ++i) {
+        res = del_value(get_cur_table(), command_argv[i]);
+        if (res == OK) 
+            successful_deletions++;
+
+        if (res == ERR_REQ) {
+            ereport(ERROR, errmsg("Error during deletion of key %s", command_argv[i]));
+            return -1;
+        }
+    }
+
+    // If more than 9 values deleted, it will constantly return 9
+    // couldn't make it easier
+
+    if (successful_deletions > 9) {
+        successful_deletions = 9;
+    }
+
+    *size_pg_answer = 3;
+    (*pg_answer)[0] = 2;
+    (*pg_answer)[1] = '0' + successful_deletions;
+    (*pg_answer)[2] = '\0';
+    ereport(LOG, errmsg("END DEL"));
+
+    return 0;
+}
+
+int
 process_command(int command_argc, char** command_argv) {
     ereport(LOG, errmsg("IN process_command"));
     return 0;// plug
@@ -116,14 +151,24 @@ process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answe
         return process_get(command_argv[1], pg_answer, size_pg_answer);
     }
     else if (!strcmp(command_argv[0], "SET")) {
-        if (command_argc < 3) {
+        if (command_argc < 3) { // it must be exactly 3
             ereport(ERROR, errmsg("need more arg for SET"));
             return -1;
         }
         ereport(LOG, errmsg("SET_PROCESSING: %s", command_argv[0]));
         return  process_set(command_argv[1], command_argv[2], pg_answer, size_pg_answer);;
 
-    } else if (!strcmp(command_argv[0], "COMMAND")) {
+    } 
+    else if (!strcmp(command_argv[0], "DEL")) {
+        if (command_argc < 2) {
+            ereport(ERROR, errmsg("need more at least 1 argument for DEL"));
+            return -1;
+        }
+        ereport(LOG, errmsg("DEL_PROCESSING %s", command_argv[0]));
+        // unlike other commands, del receives 1+ arguments. For this reason, both command_argc and command_argv are sent.
+        return process_del(command_argc, command_argv, pg_answer, size_pg_answer);
+    } 
+    else if (!strcmp(command_argv[0], "COMMAND")) {
         ereport(LOG, errmsg("COMMAND_PROCESSING: %s", command_argv[0]));
         return 0;
 
