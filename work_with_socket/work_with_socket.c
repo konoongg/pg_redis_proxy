@@ -34,7 +34,6 @@ close_connection(EV_P_ struct ev_io* io_handle) {
     free(data->write_data.answer);
     free(data);
     free(io_handle);
-    ereport(LOG, errmsg("FULL FINISH CONNECTED: %d", io_handle->fd));
 }
 
 //create socket nonblock
