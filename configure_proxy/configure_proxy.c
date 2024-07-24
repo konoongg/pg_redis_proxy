@@ -9,7 +9,9 @@
 #include "libpq-fe.h"
 
 #include "configure_proxy.h"
+#include "../work_with_db/req_result.h"
 #include "../work_with_db/work_with_db.h"
+#include "../proxy_hash/proxy_hash.h"
 
 struct proxy_status* proxy_configure;
 const ProxyConfiguration DEFAULT_CONFIG = {6379, 512, 16};
@@ -18,27 +20,32 @@ const ProxyConfiguration DEFAULT_CONFIG = {6379, 512, 16};
 bool
 check_table_existence(char** table_names, char* new_table_name,  int n_rows){
     for (int i = 0; i < n_rows; i++) {
-        ereport(LOG, errmsg("%d: check Table name: %s and new table name: %s", i, table_names[i], new_table_name));
+        //ereport(LOG, errmsg("%d: check Table name: %s and new table name: %s", i, table_names[i], new_table_name));
         if(strcmp(table_names[i], new_table_name) == 0){
             return true;
         }
     }
-    ereport(LOG, errmsg("new table name: %s does not exist",  new_table_name));
+    //ereport(LOG, errmsg("new table name: %s does not exist",  new_table_name));
     return false;
 }
 
 int
 init_proxy_status(void){
     proxy_configure = (proxy_status*) malloc(sizeof(proxy_status));
-    strcpy(proxy_configure->cur_table, "redis_0");
+    memcpy(proxy_configure->cur_table_name, "redis_0", 8);
+    proxy_configure->cur_table_num = 0;
     return 0;
 }
 
 char*
-get_cur_table(void){
-    return proxy_configure->cur_table;
+get_cur_table_name(void){
+    return proxy_configure->cur_table_name;
 }
 
+int
+get_cur_table_num(void){
+    return proxy_configure->cur_table_num;
+}
 
 // this function checks if all config.db_count tables exist, and if they
 // don't, creates new ones
@@ -46,7 +53,7 @@ int
 init_table(ProxyConfiguration config){
     char** table_names;
     int n_rows;
-    ereport(LOG, errmsg("start init table"));
+    //ereport(LOG, errmsg("start init table"));
     if(init_work_with_db() == -1){
         return -1;
     }
@@ -63,6 +70,10 @@ init_table(ProxyConfiguration config){
             if(create_table(new_table_name) == ERR_REQ){
                 return -1;
             }
+        }
+        //ereport(LOG, errmsg("tetst"));
+        if(create_hash_table(new_table_name, i) == -1){
+            return -1;
         }
     }
     free(table_names);
@@ -81,7 +92,7 @@ init_configuration(void) {
     char* error_message = strerror(errno);
 
     if (config_file == NULL) { // check if file was opened
-        ereport(ERROR, errmsg("Couldn't start loading configuration from file redis.conf: %s", error_message));
+        //ereport(ERROR, errmsg("Couldn't start loading configuration from file redis.conf: %s", error_message));
         return proxy_config;
     } 
     
@@ -89,21 +100,21 @@ init_configuration(void) {
     // and %[^\n] means read until '\n'. So there must be \n sign at the end of file
     // on both error and end of file fscanf returns the same EOF
     while (fscanf(config_file, "%[^ ] %[^\n]\n", parameter_name, parameter_value) != EOF) {
-        ereport(LOG, errmsg("Parsing config line: key: %s, value: %s", parameter_name, parameter_value));
+        //ereport(LOG, errmsg("Parsing config line: key: %s, value: %s", parameter_name, parameter_value));
         integer_parameter_value = atoi(parameter_value);
         if (!strcmp(parameter_name, "port")) {
             proxy_config.port = integer_parameter_value;
-            ereport(LOG, errmsg("Port has changed to %d", integer_parameter_value));
+            //ereport(LOG, errmsg("Port has changed to %d", integer_parameter_value));
 
         } 
         else if (!strcmp(parameter_name, "tcp-backlog")) {
             proxy_config.backlog_size = integer_parameter_value;
-            ereport(LOG, errmsg("Backlog size has changed to %d", integer_parameter_value));
+            //ereport(LOG, errmsg("Backlog size has changed to %d", integer_parameter_value));
 
         } 
         else if (!strcmp(parameter_name, "databases")) {
             proxy_config.db_count = integer_parameter_value;
-            ereport(LOG, errmsg("Amount of db's has changed to %d", integer_parameter_value));
+            //ereport(LOG, errmsg("Amount of db's has changed to %d", integer_parameter_value));
         } // on incorrect parameter name this function basically skips string
     }
 

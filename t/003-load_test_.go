@@ -93,6 +93,7 @@ func main(){
                         if send(conn, []byte(setReq), []byte("+OK\r\n")) == false{
                             return
                         }
+                        //expected :="$" + strconv.Itoa(4) + "\r\n" + "test" + "\r\n"
                         expected := "$" + strconv.Itoa(len(name)) + "\r\n" + name + "\r\n"
                         if send(conn, []byte(getReq), []byte(expected)) == false{
                             return

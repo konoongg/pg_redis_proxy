@@ -8,8 +8,8 @@
 #include <unistd.h>
 #include <limits.h>
 
-
 #include "work_with_db.h"
+#include "req_result.h"
 
 PGconn* conn;
 PGresult* res = NULL;
@@ -24,7 +24,7 @@ init_work_with_db(void){
         PQfinish(conn);
         return -1;
     }
-    ereport(LOG, errmsg("start work with db"));
+    //ereport(LOG, errmsg("start work with db"));
     conn = PQconnectdb(connect);
     if (PQstatus(conn) == CONNECTION_BAD) {
         ereport(ERROR, errmsg( "Connection to database failed: %s", PQerrorMessage(conn)));
@@ -34,7 +34,6 @@ init_work_with_db(void){
     connected = true;
     return 0;
 }
-
 
 /*
  * get_value and set_value functions execute SQL queries to get/set data
@@ -49,19 +48,23 @@ get_value(char* table, char* key, char** value, int* length){
         ereport(ERROR, errmsg("get_value: not connected with db"));
         return ERR_REQ;
     }
-    ereport(LOG, errmsg("SELECT: %s", table));
+    //ereport(LOG, errmsg("SELECT: %s", table));
     if (sprintf(SELECT, "SELECT h['%s'] FROM %s", key, table) < 0) {
         ereport(ERROR, errmsg( "sprintf err"));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
     res = PQexec(conn, SELECT); // execution
-    ereport(LOG, errmsg("select send %s", SELECT));
+    //ereport(LOG, errmsg("select send %s", SELECT));
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         ereport(ERROR, errmsg("select table failed: %s", PQerrorMessage(conn)));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
     n_rows = PQntuples(res);
-    ereport(LOG, errmsg("COUNT ROWS %d count column: %d", n_rows, PQnfields(res)));
+    //ereport(LOG, errmsg("COUNT ROWS %d count column: %d", n_rows, PQnfields(res)));
     if(n_rows > 1){
         ereport(ERROR, errmsg("get_value: more than one value"));
         return ERR_REQ;
@@ -72,7 +75,7 @@ get_value(char* table, char* key, char** value, int* length){
     }
     *value = PQgetvalue(res, 0, 0);
     *length = PQgetlength(res, 0, 0) + 1; // + \0
-    ereport(LOG, errmsg("answer: %ssize: %d", PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
+    //ereport(LOG, errmsg("answer: %ssize: %d", PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
     return OK;
 }
 
@@ -83,16 +86,20 @@ set_value(char* table, char* key, char* value){
         ereport(ERROR, errmsg("set_value: not connected with bd"));
         return ERR_REQ;
     }
-    ereport(LOG, errmsg("INSERT: %s", table));
+    //ereport(LOG, errmsg("INSERT: %s", table));
     if (sprintf (INSERT, "UPDATE %s SET h['%s']='%s'", table, key, value) < 0) {
         ereport (ERROR, errmsg ("sprintf err"));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
 
     res = PQexec(conn, INSERT);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         ereport(ERROR, errmsg("Setting element in hstore failed: %s", PQerrorMessage(conn)));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
     return OK;
 }
@@ -100,13 +107,11 @@ set_value(char* table, char* key, char* value){
 // deletes one key from table
 // should return NON if no keys were deleted
 req_result
-del_value(char* table, char* key) {     
+del_value(char* table, char* key){
     char FIND[200];
     char DELETE[200];
     int n_rows;
-
-    ereport(LOG, errmsg("del_value: entered function"));
-
+    //ereport(LOG, errmsg("del_value: entered function"));
     if (!connected) {
         ereport(ERROR, errmsg("del_value: not connected with db"));
         return ERR_REQ;
@@ -115,40 +120,48 @@ del_value(char* table, char* key) {
     // ===== Filling FIND && DELETE with needed requests =====
     if (sprintf(DELETE, "UPDATE %s SET h = delete(h, '%s')", table, key) < 0) {
         ereport(ERROR, errmsg ("sprintf err"));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
-
-    ereport(LOG, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
-
+    //ereport(LOG, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
     if (sprintf(FIND, "SELECT exist(h, '%s') FROM %s;", key, table) < 0) {
         ereport(ERROR, errmsg("spritnf err"));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
 
     // ===== Filling ended, execution starts =====
     res = PQexec(conn, FIND);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         ereport (ERROR, errmsg("FINDING ELEMENT IN HSTORE FAILED"));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
 
     n_rows = PQntuples(res);
     if (n_rows != 1) {
         ereport(ERROR, errmsg("Incorrect result of exist(h, 'key') command"));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
 
-    ereport(LOG, errmsg("Received info on '%s' key existence, answer: %s size: %d", key, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
+    //ereport(LOG, errmsg("Received info on '%s' key existence, answer: %s size: %d", key, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
     if (!strcmp(PQgetvalue(res, 0, 0), "f"))
         return NON;
 
     res = PQexec(conn, DELETE);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         ereport (ERROR, errmsg("Deleting element in hstore failed: %s", PQerrorMessage(conn)));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
 
-    ereport(LOG, errmsg("Deletion finished"));
+    //ereport(LOG, errmsg("Deletion finished"));
 
     return OK;
 }
@@ -163,9 +176,11 @@ get_table_name(char*** tables_name, int* n_rows){
     res = PQexec(conn, GET_TABLES);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         ereport(ERROR, errmsg("Query execution failed: %s", PQerrorMessage(conn)));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
-    ereport(LOG, errmsg( "GET_TABLES"));
+    //ereport(LOG, errmsg( "GET_TABLES"));
     *n_rows = PQntuples(res);
     (*tables_name) = (char**)malloc(*n_rows * sizeof(char*) );
     for(int i = 0; i < *n_rows; ++i){
@@ -182,7 +197,7 @@ create_table(char* new_table_name){
     char CREATE_HSTORE[100];
 
     // creating table
-    ereport(LOG , errmsg( "non db %s - create", new_table_name));
+    //ereport(LOG , errmsg( "non db %s - create", new_table_name));
     if (sprintf(CREATE_TABLE, "CREATE TABLE %s (h hstore)", new_table_name) < 0) {
         ereport(ERROR, errmsg( "sprintf err"));
         PQfinish(conn);
@@ -191,7 +206,9 @@ create_table(char* new_table_name){
     res = PQexec(conn, CREATE_TABLE);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         ereport(ERROR, errmsg("creating table failed: %s", PQerrorMessage(conn)));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
 
     // putting hstore into it
@@ -203,7 +220,9 @@ create_table(char* new_table_name){
     res = PQexec(conn, CREATE_HSTORE);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         ereport (ERROR, errmsg("creating hstore failed: %s", PQerrorMessage(conn)));
-        return finish_abnormally();
+        PQclear(res);
+        PQfinish(conn);
+        return ERR_REQ;
     }
     return OK;
 }
@@ -211,15 +230,16 @@ create_table(char* new_table_name){
 void
 finish_work_with_db(void){
     connected = false;
-    ereport(LOG, errmsg("finish work with db"));
+    //ereport(LOG, errmsg("finish work with db"));
     PQclear(res);
     PQfinish(conn);
 }
 
 // this function was created to satisfy DRY principle 
-inline req_result
-finish_abnormally() {
+// TODO: replace repeating PQclear, PQfinish from this file with this function
+void
+finish_work_with_db_abnormally() {
+    ereport(ERROR, errmsg("Error happened"));
     PQclear(res);
     PQfinish(conn);
-    return ERR_REQ;
 }

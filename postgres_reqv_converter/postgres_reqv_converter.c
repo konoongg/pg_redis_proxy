@@ -13,17 +13,17 @@ CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 2;
     *size_answer = size_reqv_data + count_shell_sym;
-    ereport(LOG, errmsg("START CreateSimplStr: %s ", reqv));
+    //ereport(LOG, errmsg("START CreateSimplStr: %s ", reqv));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
-        ereport(LOG, errmsg("ERROR MALLOC"));
+        ereport(ERROR, errmsg("ERROR MALLOC"));
         return -1;
     }
     (*answer)[0] = '+';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
     (*answer)[(*size_answer)- 1] = '\n';
     (*answer)[(*size_answer) - 2] = '\r';
-    ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
+    //ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
     return 0;
 }
 
@@ -34,7 +34,7 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     int count_shell_sym = 0;
     size_t size_reqv_data = (size_reqv == 1) ? 0 : size_reqv - 2;
     char size [20]; // max count symbol for size_t
-    ereport(LOG, errmsg("START CreateStr: %s %ld ", reqv, size_reqv));
+    //ereport(LOG, errmsg("START CreateStr: %s %ld ", reqv, size_reqv));
     if(size_reqv_data == 0){
         count_write_sym = 2;
         size[0] = '-';
@@ -50,15 +50,15 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         count_shell_sym = 1 + count_write_sym + 2 + 2;  // 1 - $; count_write_sym - size; 2 - /r/n after size; 2 = /r/n after data;
     }
     *size_answer = size_reqv_data + count_shell_sym;
-    ereport(LOG, errmsg("size_reqv_data: %ld, count_shell_sym: %d", size_reqv_data, count_shell_sym));
+    //ereport(LOG, errmsg("size_reqv_data: %ld, count_shell_sym: %d", size_reqv_data, count_shell_sym));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
-        ereport(LOG, errmsg("ERROR MALLOC"));
+        //ereport(LOG, errmsg("ERROR MALLOC"));
         return -1;
     }
     (*answer)[0] = '$';
     memcpy(*answer + 1, size,  count_write_sym);
-    ereport(LOG, errmsg("CreateStr: %d %d SIZE: %d", 1 + count_write_sym, 1 + count_write_sym + 1,*size_answer ));
+    //ereport(LOG, errmsg("CreateStr: %d %d SIZE: %d", 1 + count_write_sym, 1 + count_write_sym + 1,*size_answer ));
     (*answer)[1 + count_write_sym] = '\r';
     (*answer)[1 + count_write_sym + 1] = '\n';
     if(size_reqv_data != 0){
@@ -66,7 +66,7 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         (*answer)[(*size_answer)- 1] = '\n';
         (*answer)[(*size_answer) - 2] = '\r';
     }
-    ereport(LOG, errmsg("RESULT CreateStr: %s ", *answer));
+    //ereport(LOG, errmsg("RESULT CreateStr: %s ", *answer));
     return 0;
 }
 
@@ -74,17 +74,17 @@ int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 1;
     *size_answer = size_reqv_data + count_shell_sym;
-    ereport(LOG, errmsg("START CreateInt: %s ", reqv));
+    //ereport(LOG, errmsg("START CreateInt: %s ", reqv));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
-        ereport(LOG, errmsg("ERROR MALLOC"));
+        //ereport(LOG, errmsg("ERROR MALLOC"));
         return -1;
     }
     (*answer)[0] = ':';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
     (*answer)[(*size_answer)- 1] = '\n';
     (*answer)[(*size_answer) - 2] = '\r';
-    ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
+    //ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
     return 0;
 }
 
@@ -98,7 +98,7 @@ int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
  */
 int
 define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answer){
-    ereport(LOG, errmsg("START define_type_req: %d ", reqv[0]));
+    //ereport(LOG, errmsg("START define_type_req: %d ", reqv[0]));
     if(reqv[0] == 0){
         return CreateSimplStr(reqv, answer,size_reqv, size_answer);
     }

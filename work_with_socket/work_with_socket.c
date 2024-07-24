@@ -21,12 +21,12 @@ char read_buffer[BUFFER_SIZE];
 void
 close_connection(EV_P_ struct ev_io* io_handle) {
     Tsocket_data* data = (Tsocket_data*)io_handle->data;
-    ereport(LOG, errmsg("FINISH CONNECTED: %d", io_handle->fd));
+    //ereport(LOG, errmsg("FINISH CONNECTED: %d", io_handle->fd));
     ev_io_stop(loop, data->write_io_handle);
     ev_io_stop(loop, data->read_io_handle);
     close(io_handle->fd);
     for(int i = 0; i < data->read_data.argc; ++i){
-        ereport(LOG, errmsg("DATA: %s", data->read_data.argv[i]));
+        //ereport(LOG, errmsg("DATA: %s", data->read_data.argv[i]));
         free(data->read_data.argv[i]);
     }
     close(io_handle->fd);
@@ -70,18 +70,18 @@ write_data(int fd, char* mes, int count_sum){
 void
 parse_cli_mes(Tsocket_read_data* data){
     int cur_buffer_index = 0;
-    ereport(LOG, errmsg("SIZE: %d", data->cur_buffer_size));
+    //ereport(LOG, errmsg("SIZE: %d", data->cur_buffer_size));
     while(1){
         // конечные автоматы наше все
         char c = data->read_buffer[cur_buffer_index];
         //ereport(LOG, errmsg("SYM %c %d ", c, c));
         if(c == '*' && data->read_status == ARRAY_WAIT){
-            ereport(LOG, errmsg("START PARS INT"));
+            //ereport(LOG, errmsg("START PARS INT"));
             data->read_status = NUM_OR_MINUS_WAIT;
         }
         else if(((c >= '0' && c <= '9') || c == '-') && data->read_status == NUM_OR_MINUS_WAIT){
             if(c >= '0' && c <= '9'){
-                ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
+                //ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
                 data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
                 data->parsing.is_negative = false;
             }
@@ -91,22 +91,22 @@ parse_cli_mes(Tsocket_read_data* data){
             data->read_status = NUM_WAIT;
         }
         else if(c >= '0' && c <= '9' && data->read_status == NUM_WAIT){
-            ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
+            //ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
             data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
         }
         else if(c == '\r' && data->read_status == NUM_WAIT){
             if(data->parsing.is_negative){
                 data->parsing.parsing_num *= -1;
             }
-            ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
+           //ereport(LOG, errmsg("NUM: %d", data->parsing.parsing_num));
             if(data->argc == -1){
                 data->argc = data->parsing.parsing_num;
-                ereport(LOG, errmsg("ARGC: %d", data->argc));
+                //ereport(LOG, errmsg("ARGC: %d", data->argc));
                 data->cur_count_argv = 0;
                 data->read_status = START_STRING_WAIT;
                 data->argv = (char**)malloc(data->argc * sizeof(char*));
                 if(data->argv == NULL){
-                    ereport(ERROR, errmsg("CAN'T MALLOC"));
+                    //ereport(ERROR, errmsg("CAN'T MALLOC"));
                     data->exit_status = ERR;
                     return;
                 }
@@ -115,10 +115,10 @@ parse_cli_mes(Tsocket_read_data* data){
                 data->parsing.size_str = data->parsing.parsing_num;
                 data->parsing.cur_size_str = 0;
                 data->parsing.parsing_str = (char*)malloc((data->parsing.size_str + 1)  * sizeof(char));
-                ereport(LOG, errmsg(" DATA parsing_str: %p", data->parsing.parsing_str));
+                //ereport(LOG, errmsg(" DATA parsing_str: %p", data->parsing.parsing_str));
                 data->read_status = STRING_WAIT;
                 if(data->parsing.parsing_str == NULL){
-                    ereport(ERROR, errmsg("CAN'T MALLOC"));
+                    //ereport(ERROR, errmsg("CAN'T MALLOC"));
                     data->exit_status = ERR;
                     return;
                 }
@@ -139,15 +139,15 @@ parse_cli_mes(Tsocket_read_data* data){
             data->parsing.cur_size_str += 1;
             if(data->parsing.cur_size_str == data->parsing.size_str){
                 data->parsing.parsing_str[data->parsing.size_str] = '\0';
-                ereport(LOG, errmsg("STR :%s cur_count_argv: %d", data->parsing.parsing_str, data->cur_count_argv));
+                //ereport(LOG, errmsg("STR :%s cur_count_argv: %d", data->parsing.parsing_str, data->cur_count_argv));
                 data->argv[data->cur_count_argv] = (char*)malloc((data->parsing.size_str + 1) * sizeof(char));
                 if(data->argv[data->cur_count_argv] == NULL){
-                    ereport(ERROR, errmsg("CAN'T MALLOC"));
+                    //ereport(ERROR, errmsg("CAN'T MALLOC"));
                     data->exit_status = ERR;
                     return;
                 }
                 memcpy(data->argv[data->cur_count_argv], data->parsing.parsing_str, data->parsing.size_str + 1);
-                ereport(LOG, errmsg("+ arg: %s  %s ", data->argv[data->cur_count_argv], data->parsing.parsing_str));
+                //ereport(LOG, errmsg("+ arg: %s  %s ", data->argv[data->cur_count_argv], data->parsing.parsing_str));
                 free(data->parsing.parsing_str);
                 data->cur_count_argv++;
                 data->parsing.size_str = data->parsing.cur_size_str = 0;
@@ -160,7 +160,7 @@ parse_cli_mes(Tsocket_read_data* data){
             }
         }
         else if(data->read_status == END){
-            ereport(LOG, errmsg("end: %d", c));
+            //ereport(LOG, errmsg("end: %d", c));
             if(c == '\n'){
                 cur_buffer_index++;
                 replace_part_of_buffer(data, cur_buffer_index);
@@ -170,7 +170,7 @@ parse_cli_mes(Tsocket_read_data* data){
         }
         cur_buffer_index++;
         if(cur_buffer_index >= data->cur_buffer_size){
-            ereport(LOG, errmsg("NOT ALL DATA: %d cur_buffer_index: %d data->cur_buffer_size:%d", data->read_status, cur_buffer_index, data->cur_buffer_size));
+            //ereport(LOG, errmsg("NOT ALL DATA: %d cur_buffer_index: %d data->cur_buffer_size:%d", data->read_status, cur_buffer_index, data->cur_buffer_size));
             data->cur_buffer_size = 0;
             data->exit_status = NOT_ALL;
             return;
@@ -182,10 +182,10 @@ parse_cli_mes(Tsocket_read_data* data){
 // saves data to a buffer if more than one packet has been written off
 void
 replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index){
-    ereport(LOG, errmsg("ARGC final1: %d cur_buffer_size: %d", data->argc, data->cur_buffer_size));
+    //ereport(LOG, errmsg("ARGC final1: %d cur_buffer_size: %d", data->argc, data->cur_buffer_size));
     memmove(data->read_buffer, data->read_buffer + cur_buffer_index, data->cur_buffer_size - cur_buffer_index);
     data->cur_buffer_size -=  cur_buffer_index;
-    ereport(LOG, errmsg("REPLACE: %d", data->cur_buffer_size));
+    //ereport(LOG, errmsg("REPLACE: %d", data->cur_buffer_size));
 }
 
 /*
@@ -202,7 +202,7 @@ int
 get_socket(int fd){
     int socket_fd = accept(fd, NULL, NULL);
     int opt;
-    ereport(LOG, errmsg( "ACCEPT: %d", socket_fd));
+    //ereport(LOG, errmsg( "ACCEPT: %d", socket_fd));
     if (socket_fd == -1) {
         char* err = strerror(errno);
         ereport(ERROR, errmsg("on_accept_cb(): %s", err));
@@ -221,7 +221,7 @@ get_socket(int fd){
     }
     if (setsockopt(socket_fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0) {
         char* err = strerror(errno);
-        fprintf(stderr, "setsockopt TCP_NODELAY: %s\n", err);
+        ereport(ERROR, errmsg("setsockopt TCP_NODELAY: %s", err));
         close(socket_fd);
         return -1;
     }
@@ -233,9 +233,9 @@ int
 read_data(EV_P_ struct ev_io* io_handle, char* read_buffer, int cur_buffer_size){
     int res = read(io_handle->fd, read_buffer + cur_buffer_size, BUFFER_SIZE - cur_buffer_size);
     if (!res || res < 0) {
-        ereport(LOG, errmsg( "CLOS CONNCTION"));
+        //ereport(LOG, errmsg( "CLOS CONNCTION"));
         close_connection(loop, io_handle);
-        ereport(LOG, errmsg( "SUC CLOS CONNCTION"));
+        //ereport(LOG, errmsg( "SUC CLOS CONNCTION"));
         return - 1;
     }
     return res;
