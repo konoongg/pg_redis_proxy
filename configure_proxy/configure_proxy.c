@@ -34,6 +34,7 @@ init_proxy_status(void){
     proxy_configure = (proxy_status*) malloc(sizeof(proxy_status));
     memcpy(proxy_configure->cur_table_name, "redis_0", 8);
     proxy_configure->cur_table_num = 0;
+    proxy_configure->cashing = ALWAYS;
     return 0;
 }
 
@@ -45,6 +46,11 @@ get_cur_table_name(void){
 int
 get_cur_table_num(void){
     return proxy_configure->cur_table_num;
+}
+
+cashing_status
+get_cashing_status(void){
+    return proxy_configure->cashing;
 }
 
 // this function checks if all config.db_count tables exist, and if they
@@ -122,6 +128,5 @@ init_configuration(void) {
         error_message = strerror(errno);
         ereport(ERROR, errmsg("Error on closing file redis.conf: %s", error_message));
     }
-
     return proxy_config;
 }

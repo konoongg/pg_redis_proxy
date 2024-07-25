@@ -70,8 +70,8 @@ get_value(char* table, char* key, char** value, int* length){
         return ERR_REQ;
     }
     else if(n_rows == 0){
+        *value = NULL;
         return NON;
-
     }
     *value = PQgetvalue(res, 0, 0);
     *length = PQgetlength(res, 0, 0) + 1; // + \0

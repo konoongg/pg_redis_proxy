@@ -7,9 +7,16 @@
 // #define DEFAULT_BACKLOG_SIZE    (512)
 // #define DEFAULT_DB_COUNT        (16)
 
+enum cashing_status{
+    NO, // no cash
+    GET, // only get in a cash, set and del in db
+    ALWAYS // always in a cash, create dump in bd
+} typedef cashing_status;
+
 struct proxy_status{
     char cur_table_name[100];
     int cur_table_num;
+    cashing_status cashing;
 } typedef proxy_status;
 
 struct ProxyConfiguration {
@@ -26,3 +33,4 @@ int get_cur_table_num(void);
 int get_count_table(void);
 int init_proxy_status(void);
 ProxyConfiguration init_configuration(void);
+cashing_status get_cashing_status(void);

@@ -186,7 +186,12 @@ process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answe
         //ereport(LOG, errmsg("DEL_PROCESSING %s", command_argv[0]));
         // unlike other commands, del receives 1+ arguments. For this reason, both command_argc and command_argv are sent.
         return process_del(command_argc, command_argv, pg_answer, size_pg_answer);
-    } 
+    }
+    else if (!strcmp(command_argv[0], "PING")) {
+        //ereport(LOG, errmsg("DEL_PROCESSING %s", command_argv[0]));
+        // unlike other commands, del receives 1+ arguments. For this reason, both command_argc and command_argv are sent.
+        return process_ping(pg_answer, size_pg_answer);
+    }
     else if (!strcmp(command_argv[0], "COMMAND")) {
         //ereport(LOG, errmsg("COMMAND_PROCESSING: %s", command_argv[0]));
         return 0;
