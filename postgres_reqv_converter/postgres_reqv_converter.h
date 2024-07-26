@@ -4,3 +4,4 @@ int define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answe
 int CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer);
 int CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer);
 int CreateInt(char* reqv, char** answer, size_t size_reqv, int* size_answer);
+int CreateErr(char* reqv, char** answer, size_t size_reqv, int* size_answer);

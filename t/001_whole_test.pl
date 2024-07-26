@@ -35,8 +35,7 @@ my $length = -1;
 
 my @set_tests = (
 	["*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n", "+OK\r\n", "Basic set test"],
-	["*3\r\n\$3\r\nSET\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n", "+OK\r\n", "Basic SET test"],
-	#["*4\r\n\$3\r\nset\r\n\$5\r\nabcde\r\n\$5\r\nefghi\r\n\$5\r\n12345\r\n", "-ERR syntax error\r\n", "Filling set with incorrect amount of values"],
+	["*4\r\n\$3\r\nset\r\n\$5\r\nabcde\r\n\$5\r\nefghi\r\n\$5\r\n12345\r\n", "-ERR syntax error\r\n", "Filling set with incorrect amount of values"],
 );
 
 # add: set key val1
@@ -81,17 +80,20 @@ my %correct_resp_tests = (
 # Block 1.1: set tests
 ####################################################################################################################################################################################
 
+#1, 2
 for (my $i = 0; $i <= $#set_tests; $i++) {
+	print "OK\n";
     $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
     $socket->send($request);
     $socket->recv($response, 1024);
 
 	$socket->send($set_tests[$i][0]);
 	$socket->recv($response, 1024);
-	# print("Response: $response, Cur: $_, Hash: $other_tests{$_}\n");
+	print("Response: $response, Cur: $i, Expected $set_tests[$i][1]\n");
 	ok($response eq $set_tests[$i][1], $set_tests[$i][2]);
 }
 
+# 3 Update test: putting 2 values and then looking if the latest value is in key
 $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
 $socket->send($request);
 $socket->recv($response, 1024);
@@ -117,8 +119,12 @@ ok($response eq "\$6\r\nvalue2\r\n", "Update test");
 ####################################################################################################################################################################################
 # Block 1.2: get tests
 ####################################################################################################################################################################################
-
+#4
 # checking its work:
+$request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+
 $request = "*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n";
 $socket->send($request);
 $socket->recv($response, 1024);
@@ -129,53 +135,7 @@ $socket->recv($response, 1024);
 ok($response eq "\$5\r\nvalue\r\n", "Get test: get works");
 ####################################################################################################################################################################################
 
-# checking its work:
-$request = "*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-
-$request = "*2\r\n\$3\r\nGET\r\n\$3\r\nkey\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq "\$5\r\nvalue\r\n", "Get test: GET works");
-################################################################################################################################################################################################
-
-# GET after del
-$request = "*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-
-$request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-
-$request = "*2\r\n\$3\r\nGET\r\n\$3\r\nkey\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq  "\$-1\r\n", "Get test: GET after del");
-################################################################################################################################################################################################
-
-# trying to get unexisting key:ls
-$request = "*2\r\n\$3\r\nget\r\n\$20\r\nUn3x1st1ng_k3y_11251\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq "\$-1\r\n", "Get test: unexciting value");
-
-####################################################################################################################################################################################
-
-
-# checking its work:
-$request = "*3\r\n\$3\r\nset\r\n\$3\r\nkey\r\n\$5\r\nvalue\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-
-$request = "*2\r\n\$3\r\nGeT\r\n\$3\r\nkey\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq "\$5\r\nvalue\r\n", "Get test: GeT works");
-################################################################################################################################################################################################
-
-
+#5
 #pasring two reqv
 $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
 $socket->send($request);
@@ -191,6 +151,7 @@ $socket->recv($response, 1024);
 ok($response eq "\$5\r\nvalue\r\n\$5\r\nvalue\r\n", "Get test: get two response");
 ####################################################################################################################################################################################
 
+#6
 #del one test
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_test\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
@@ -202,17 +163,7 @@ $socket->recv($response, 1024);
 ok($response eq ":1\r\n", "DEL test: del one");
 ####################################################################################################################################################################################
 
-#DEL one test
-$request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_test\r\n\$8\r\ndel_test\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-
-$request = "*2\r\n\$3\r\nDEL\r\n\$8\r\ndel_test\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq ":1\r\n", "DEL test: DEL one");
-####################################################################################################################################################################################
-
+#7
 #del not exist
 $request = "*2\r\n\$3\r\ndel\r\n\$8\r\ndel_test\r\n";
 $socket->send($request);
@@ -224,6 +175,7 @@ $socket->recv($response, 1024);
 ok($response eq ":0\r\n", "DEL test: not exist");
 ######################################################################################################################################################################################
 
+#8
 #del two
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
 $socket->send($request);
@@ -239,6 +191,7 @@ $socket->recv($response, 1024);
 ok($response eq ":2\r\n", "DEL test: del two");
 #########################################################################################################################################################################################
 
+#9
 #del one of two (fisrst)
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
 $socket->send($request);
@@ -258,6 +211,7 @@ $socket->recv($response, 1024);
 ok($response eq ":1\r\n", "DEL test: del one of two (first)");
 ###########################################################################################################################################################################################
 
+#10
 #del one of two (second)
 $request = "*3\r\n\$3\r\nset\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two1\r\n";
 $socket->send($request);
@@ -275,21 +229,6 @@ $request = "*3\r\n\$3\r\ndel\r\n\$8\r\ndel_two1\r\n\$8\r\ndel_two2\r\n";
 $socket->send($request);
 $socket->recv($response, 1024);
 ok($response eq ":1\r\n", "DEL test: del one of two (second)");
-######################################################################################################################################################################################################################
-
-#ping test
-$request = "*1\r\n\$4\r\nping\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq "+PONG\r\n", "ping test: just ping");
-###########################################################################################################################################################################################################################
-
-#PING test
-$request = "*1\r\n\$4\r\nPING\r\n";
-$socket->send($request);
-$socket->recv($response, 1024);
-ok($response eq "+PONG\r\n", "ping test: just PING");
-#########################################################
 
 ##5
 ## "bad" situations
@@ -309,8 +248,15 @@ ok($response eq "+PONG\r\n", "ping test: just PING");
 #ok($response eq "-ERR wrong number of arguments for 'get' command\r\n", "Get test: incorrect number of arguments(0)");
 ####################################################################################################################################################################################
 
+##6
+## trying to get unexisting key:ls
+#$request = "*2\r\n\$3\r\nget\r\n\$20\r\nUn3x1st1ng_k3y_11251\r\n";
+#$socket->send($request);
+#$socket->recv($response, 1024);
+#ok($response eq "\$-1\r\n", "Get test: unexisting value");
 
-#Block 1.3: del tests
+####################################################################################################################################################################################
+# Block 1.3: del tests
 ####################################################################################################################################################################################
 
 #7

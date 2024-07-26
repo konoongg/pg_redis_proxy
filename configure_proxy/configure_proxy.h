@@ -3,37 +3,49 @@
 #include "libpq-fe.h"
 #include <stdbool.h>
 
-// #define DEFAULT_PORT            (6379) // 6379 is a default redis port
-// #define DEFAULT_BACKLOG_SIZE    (512)
-// #define DEFAULT_DB_COUNT        (16)
-
-enum dump_status{
-    NO_CASH, // no cash
-    GET_CASH, // only get in a cash, set and del in db
-    ONLY_CASH, // dont do dump in db
-    DEFFER_DUMP //
-} typedef dump_status;
+// имена такие из-за конфликта имён
+enum LoggingLevel {
+    LOG_NOTHING = 0,  // logging is disabled
+    LOG_WARNING = 1,  // Only critical messages are logged
+    LOG_NOTICE = 2,   // Moderately verbose
+    LOG_VERBOSE = 3,  // Many rarely useful info
+    LOG_DEBUG = 4           // log everything
+} typedef LoggingLevel;
+// so in code there will be something like
+// if (config.loglevel <= WARNING)
+//      ereport(ERROR, errmsg("..."));
 
 struct proxy_status{
     char cur_table_name[100];
     int cur_table_num;
-    dump_status cashing;
-    int dump_time; //  dump time interval in sec
 } typedef proxy_status;
+
+struct SnapshotData {
+    unsigned int saving_period;
+    unsigned int actions_needed;
+} typedef SnapshotData;
 
 struct ProxyConfiguration {
     unsigned int port;
     unsigned int backlog_size;
     unsigned int db_count;
-} typedef ProxyConfiguration;
- // i tried to put extern here, didn't work.
+    LoggingLevel loglevel;
+    bool daemonize;
+    char* raw_bind;
+    char* logfile;
 
-int init_table(ProxyConfiguration);
+    int snapshotdata_count;
+    SnapshotData* save_data;
+} typedef ProxyConfiguration;
+
+extern ProxyConfiguration config;
+
+int init_table(void);
 bool check_table_existence(char** tables_name, char* new_table_name,  int n_rows);
 char* get_cur_table_name(void);
 int get_cur_table_num(void);
 int get_count_table(void);
-int get_dump_time(void);
 int init_proxy_status(void);
-ProxyConfiguration init_configuration(void);
-dump_status get_cashing_status(void);
+void init_configuration(void);
+void free_configuration(void);
+ProxyConfiguration get_configuration(void);
