@@ -7,11 +7,11 @@
 #include <string.h>
 
 HTAB** hashes = NULL;
-int count_hash = 0;
+int count_hash_table = 0;
 
 // We start working with hashes, creating a separate hash table for each database table.
 int init_hashes(int count_table){
-    count_hash = count_table;
+    count_hash_table = count_table;
     hashes = (HTAB**)malloc(count_table * sizeof(HTAB*));
     if(hashes == NULL){
         ereport(ERROR, (errmsg("can't malloc")));
@@ -20,6 +20,7 @@ int init_hashes(int count_table){
     return 0;
 }
 
+//Create a hash table for the passed table and store it in an array of hash tables
 int create_hash_table(char* table_name, int table_num){
     HASHCTL info;
     HTAB* hash_table;
@@ -62,11 +63,13 @@ char* check_hash_table(int table_num, const char* key, bool* found){
  * We address the hash table and obtain a reference to the memory area where we place the key
  * (if the key size is smaller than KEY_SIZE, we fill the remaining space with zeros),
  * then there is one byte responsible for the value state:
- * 0 - actual,
- * 1 - modified,
- * 2 - deleted,
+ * 0 - ,
+ * 1 - delete
  * and after that comes the actual value.
- * */
+ * if dump status = only, don't need update db
+ *
+ * if value == NULL, change only status, else change value and status
+ */
 int set_hash_table(int table_num, char* key, char* value, char new_status){
     bool found;
     char* result;
@@ -80,6 +83,7 @@ int set_hash_table(int table_num, char* key, char* value, char new_status){
         return -1;
     }
     memcpy(result, key, strlen(key + 1));
+    //The key has a specific size to ensure that hashes are the same for two non-maximum-sized keys the remaining space will be filled with zeros
     if(strlen(key) + 1 < KEY_SIZE){
         memset(result + strlen(key) + 1 , 0 , KEY_SIZE - (strlen(key) + 1 ));
     }
@@ -90,8 +94,9 @@ int set_hash_table(int table_num, char* key, char* value, char new_status){
     return 0;
 }
 
+// Free all hash tables
 void free_hashes(void){
-    for(int i = 0; i < count_hash; ++i){
+    for(int i = 0; i < count_hash_table; ++i){
         if (hashes[i] != NULL) {
             hash_destroy(hashes[i]);
             hashes[i] = NULL;

@@ -9,13 +9,14 @@
 #include "../work_with_db/work_with_db.h"
 #include "../configure_proxy/configure_proxy.h"
 #include "../proxy_hash/proxy_hash.h"
+#include "../logger/logger.h"
 
 req_result req_get(char* key, char** value, int* length){
     int table_num;
     bool found;
     req_result res;
     bool fit_in_cash = strlen(key) + 1 < KEY_SIZE && strlen(*value) + 1 < VALUE_SIZE;
-    if((get_cashing_status() == GET || get_cashing_status() == ALWAYS) && fit_in_cash){
+    if((get_cashing_status() == GET_CASH || get_cashing_status() == ONLY_CASH || get_cashing_status() == DEFFER_DUMP) && fit_in_cash){
         table_num = get_cur_table_num();
         (*value) = check_hash_table(table_num, key, &found);
         //ereport(LOG, (errmsg("RESULT: %s found: %d", *value, found)));
@@ -43,7 +44,7 @@ req_result req_get(char* key, char** value, int* length){
         }
         return res;
     }
-    else if(get_cashing_status() == NO || !fit_in_cash){
+    else if(get_cashing_status() == NO_CASH || !fit_in_cash){
         return get_value(get_cur_table_name(), key, value, length);
     }
     ereport(ERROR, (errmsg("undefined cashing status")));
@@ -54,24 +55,29 @@ req_result req_set(char* key, char* value){
     int table_num;
     req_result res;
     bool fit_in_cash = strlen(key) + 1 < KEY_SIZE && strlen(value) + 1 < VALUE_SIZE;
-    if(get_cashing_status() == GET && fit_in_cash){
+    if(get_cashing_status() == GET_CASH && fit_in_cash){
         table_num = get_cur_table_num();
         res = set_value(get_cur_table_name(), key, value);
         if(res != ERR_REQ){
-            if (set_hash_table(table_num, key, value, 1) == -1){
+            if (set_hash_table(table_num, key, value, 0) == -1){
                 return ERR_REQ;
             }
         }
         return res;
     }
-    else if(get_cashing_status() == ALWAYS && fit_in_cash){
+    else if((get_cashing_status() == ONLY_CASH || get_cashing_status() == DEFFER_DUMP) && fit_in_cash){
         table_num = get_cur_table_num();
-        if (set_hash_table(table_num, key, value, 1) == -1){
+        if (set_hash_table(table_num, key, value, 0) == -1){
             return ERR_REQ;
+        }
+        if(get_cashing_status() == DEFFER_DUMP){
+            if(add_log(SET, key, value) == -1){
+                return ERR_REQ;
+            }
         }
         return OK;
     }
-    else if(get_cashing_status() == NO || !fit_in_cash){
+    else if(get_cashing_status() == NO_CASH || !fit_in_cash){
         return set_value(get_cur_table_name(), key, value);
     }
     ereport(ERROR, (errmsg("undefined cashing status")));
@@ -82,17 +88,17 @@ req_result req_del(char* key){
     int table_num;
     req_result res;
     bool fit_in_cash = strlen(key) + 1 < KEY_SIZE ;
-    if(get_cashing_status() == GET && fit_in_cash) {
+    if(get_cashing_status() == GET_CASH && fit_in_cash) {
         table_num = get_cur_table_num();
         res = del_value(get_cur_table_name(), key);
         if(res != ERR_REQ){
-            if (set_hash_table(table_num, key, NULL, 2) == -1){
+            if (set_hash_table(table_num, key, NULL, 1) == -1){
                 return ERR_REQ;
             }
         }
         return res;
     }
-    else if (get_cashing_status() == ALWAYS && fit_in_cash){
+    else if (( get_cashing_status() == ONLY_CASH || get_cashing_status() == DEFFER_DUMP) && fit_in_cash){
         bool found = false;
         char* result = NULL;
         table_num = get_cur_table_num();
@@ -109,14 +115,23 @@ req_result req_del(char* key){
             ereport(LOG, (errmsg("not in cash")));
             res = del_value(get_cur_table_name(), key);
         }
-        if (set_hash_table(table_num, key, NULL, 2) == -1){
+        if (set_hash_table(table_num, key, NULL, 1) == -1){
             return ERR_REQ;
+        }
+        if(get_cashing_status() == DEFFER_DUMP){
+            if(add_log(DEL, key, NULL) == -1){
+                return ERR_REQ;
+            }
         }
         return res;
     }
-    else if(get_cashing_status() == NO || !fit_in_cash){
+    else if(get_cashing_status() == NO_CASH || !fit_in_cash){
         return del_value(get_cur_table_name(), key);
     }
     ereport(ERROR, (errmsg("undefined cashing status")));
     return ERR_REQ;
+}
+
+req_result sync_with_db(){
+    clear_log();
 }

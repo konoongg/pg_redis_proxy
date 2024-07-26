@@ -7,16 +7,18 @@
 // #define DEFAULT_BACKLOG_SIZE    (512)
 // #define DEFAULT_DB_COUNT        (16)
 
-enum cashing_status{
-    NO, // no cash
-    GET, // only get in a cash, set and del in db
-    ALWAYS // always in a cash, create dump in bd
-} typedef cashing_status;
+enum dump_status{
+    NO_CASH, // no cash
+    GET_CASH, // only get in a cash, set and del in db
+    ONLY_CASH, // dont do dump in db
+    DEFFER_DUMP //
+} typedef dump_status;
 
 struct proxy_status{
     char cur_table_name[100];
     int cur_table_num;
-    cashing_status cashing;
+    dump_status cashing;
+    int dump_time; //  dump time interval in sec
 } typedef proxy_status;
 
 struct ProxyConfiguration {
@@ -31,6 +33,7 @@ bool check_table_existence(char** tables_name, char* new_table_name,  int n_rows
 char* get_cur_table_name(void);
 int get_cur_table_num(void);
 int get_count_table(void);
+int get_dump_time(void);
 int init_proxy_status(void);
 ProxyConfiguration init_configuration(void);
-cashing_status get_cashing_status(void);
+dump_status get_cashing_status(void);

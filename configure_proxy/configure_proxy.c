@@ -34,8 +34,14 @@ init_proxy_status(void){
     proxy_configure = (proxy_status*) malloc(sizeof(proxy_status));
     memcpy(proxy_configure->cur_table_name, "redis_0", 8);
     proxy_configure->cur_table_num = 0;
-    proxy_configure->cashing = ALWAYS;
+    proxy_configure->cashing = DEFFER_DUMP;
+    proxy_configure->dump_time = 1;
     return 0;
+}
+
+int
+get_dump_time(void){
+    return proxy_configure->dump_time;
 }
 
 char*
@@ -48,7 +54,7 @@ get_cur_table_num(void){
     return proxy_configure->cur_table_num;
 }
 
-cashing_status
+dump_status
 get_cashing_status(void){
     return proxy_configure->cashing;
 }
@@ -123,7 +129,6 @@ init_configuration(void) {
             //ereport(LOG, errmsg("Amount of db's has changed to %d", integer_parameter_value));
         } // on incorrect parameter name this function basically skips string
     }
-
     if (fclose(config_file) == EOF) {
         error_message = strerror(errno);
         ereport(ERROR, errmsg("Error on closing file redis.conf: %s", error_message));

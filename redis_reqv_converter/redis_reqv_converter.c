@@ -27,7 +27,7 @@ process_get(char* key, char** pg_answer, int* size_pg_answer){
         //ereport(LOG, errmsg("IN process_get: GET non key: %s",key));
         *pg_answer = (char*)malloc( sizeof(char));
         if(*pg_answer == NULL){
-            ereport(ERROR, errmsg("ERROR MALLOC"));
+            ereport(ERROR, errmsg("can't malloc"));
             return -1;
         }
         (*pg_answer)[0] = 3;

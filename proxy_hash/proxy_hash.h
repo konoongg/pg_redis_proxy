@@ -3,7 +3,6 @@
 #include "utils/hsearch.h"
 #include <stdbool.h>
 
-
 #define KEY_SIZE 100
 #define DATA_SIZE 200
 #define VALUE_SIZE DATA_SIZE - 1 - KEY_SIZE // one byte for status
