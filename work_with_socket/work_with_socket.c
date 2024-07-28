@@ -18,8 +18,7 @@ int cur_buffer_index = 0;
 char read_buffer[BUFFER_SIZE];
 
 //removes the socket from the loop and frees all associated resources
-void
-close_connection(EV_P_ struct ev_io* io_handle) {
+void close_connection(EV_P_ struct ev_io* io_handle) {
     Tsocket_data* data = (Tsocket_data*)io_handle->data;
     //ereport(LOG, errmsg("FINISH CONNECTED: %d", io_handle->fd));
     ev_io_stop(loop, data->write_io_handle);
@@ -37,8 +36,7 @@ close_connection(EV_P_ struct ev_io* io_handle) {
 }
 
 //create socket nonblock
-bool
-socket_set_nonblock(int socket_fd){
+bool socket_set_nonblock(int socket_fd){
     int flags = fcntl(socket_fd, F_GETFL, 0);
     if (flags < 0) {
         return false;
@@ -50,8 +48,7 @@ socket_set_nonblock(int socket_fd){
 }
 
 //write data in socket
-int
-write_data(int fd, char* mes, int count_sum){
+int write_data(int fd, char* mes, int count_sum){
     int writeBytes = 0;
     writeBytes = write(fd, mes, count_sum);
     if(writeBytes == -1){
@@ -67,8 +64,7 @@ write_data(int fd, char* mes, int count_sum){
  * it takes a character from the buffer and, depending on the state of the machine,
  * performs the necessary actions
  */
-void
-parse_cli_mes(Tsocket_read_data* data){
+void parse_cli_mes(Tsocket_read_data* data){
     int cur_buffer_index = 0;
     //ereport(LOG, errmsg("SIZE: %d", data->cur_buffer_size));
     while(1){
@@ -180,8 +176,7 @@ parse_cli_mes(Tsocket_read_data* data){
 
 
 // saves data to a buffer if more than one packet has been written off
-void
-replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index){
+void replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index){
     //ereport(LOG, errmsg("ARGC final1: %d cur_buffer_size: %d", data->argc, data->cur_buffer_size));
     memmove(data->read_buffer, data->read_buffer + cur_buffer_index, data->cur_buffer_size - cur_buffer_index);
     data->cur_buffer_size -=  cur_buffer_index;
@@ -198,8 +193,7 @@ replace_part_of_buffer(Tsocket_read_data* data, int cur_buffer_index){
  *                    ^
  *   (*arg)="get"
  */
-int
-get_socket(int fd){
+int get_socket(int fd){
     int socket_fd = accept(fd, NULL, NULL);
     int opt;
     //ereport(LOG, errmsg( "ACCEPT: %d", socket_fd));
@@ -229,8 +223,7 @@ get_socket(int fd){
 }
 
 // read data in buffer
-int
-read_data(EV_P_ struct ev_io* io_handle, char* read_buffer, int cur_buffer_size){
+int read_data(EV_P_ struct ev_io* io_handle, char* read_buffer, int cur_buffer_size){
     int res = read(io_handle->fd, read_buffer + cur_buffer_size, BUFFER_SIZE - cur_buffer_size);
     if (!res || res < 0) {
         //ereport(LOG, errmsg( "CLOS CONNCTION"));

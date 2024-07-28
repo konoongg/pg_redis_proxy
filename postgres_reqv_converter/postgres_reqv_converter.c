@@ -8,8 +8,7 @@
 
 #include "postgres_reqv_converter.h"
 
-int
-CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
+int CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 2;
     *size_answer = size_reqv_data + count_shell_sym;
@@ -28,8 +27,7 @@ CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
 }
 
 //count_shell_sym is /n /r and size
-int
-CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
+int CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     int count_write_sym = 0;
     int count_shell_sym = 0;
     size_t size_reqv_data = (size_reqv == 1) ? 0 : size_reqv - 2;
@@ -70,8 +68,7 @@ CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     return 0;
 }
 
-int 
-CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
+int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 1;
     *size_answer = size_reqv_data + count_shell_sym;
@@ -89,8 +86,7 @@ CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     return 0;
 }
 
-int 
-CreateErr(char* reqv, char** answer, size_t size_reqv, int* size_answer) {
+int CreateErr(char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     ereport(NOTICE, errmsg("Start CreateErr: %s ", reqv));
 
     *size_answer = 5 + size_reqv + 2 - 1; // '-ERR ' + size of error + '\r\n' - 0th char '0x01'
@@ -116,8 +112,7 @@ CreateErr(char* reqv, char** answer, size_t size_reqv, int* size_answer) {
  *  For Arrays the first byte of the reply is "*" (code  4)
  * The first byte is the response code, followed by the response from Postgres
  */
-int
-define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answer){
+int define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     ereport(LOG, errmsg("START define_type_req: %d ", reqv[0]));
     if(reqv[0] == 0){
         return CreateSimplStr(reqv, answer,size_reqv, size_answer);

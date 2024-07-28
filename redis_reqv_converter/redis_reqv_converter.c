@@ -17,8 +17,7 @@
 
 
 // get orginally receives one arg, its char* key. pg_answer stores response from postgres 
-int
-process_get(char* key, char** pg_answer, int* size_pg_answer){
+int process_get(char* key, char** pg_answer, int* size_pg_answer){
     char* value;
     int length_value = 0;
     req_result res = req_get(key, &value, &length_value);
@@ -34,7 +33,9 @@ process_get(char* key, char** pg_answer, int* size_pg_answer){
         *size_pg_answer = 1;
     }
     else if(res == ERR_REQ){
-        if (config.loglevel >= LOG_DEBUG) ereport(ERROR, errmsg("IN process_get: GET err with key: %s", key));
+        if (config.loglevel >= LOG_DEBUG) {
+            ereport(ERROR, errmsg("IN process_get: GET err with key: %s", key));
+        }
         return -1;
     }
     else{
@@ -50,8 +51,7 @@ process_get(char* key, char** pg_answer, int* size_pg_answer){
 }
 
 // should return +OK (or smth like that) if it worked
-int
-process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
+int process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
     req_result res = req_set(key, value);
     ereport(LOG, errmsg("START SET"));
     if(res == ERR_REQ){
@@ -73,8 +73,7 @@ process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
     return 0;
 }
 
-int
-process_del(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
+int process_del(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
     int successful_deletions = 0;
     int count_write_sym;
     req_result res;
@@ -110,8 +109,7 @@ process_del(int command_argc, char** command_argv, char** pg_answer, int* size_p
     return 0;
 }
 
-int
-process_ping(char** pg_answer, int* size_pg_answer){
+int process_ping(char** pg_answer, int* size_pg_answer){
     ereport(LOG, errmsg("IN process_ping"));
     *size_pg_answer = 6;
     *pg_answer = (char*)malloc(*size_pg_answer * sizeof(char));
@@ -133,11 +131,11 @@ int process_command(int command_argc, char** command_argv) {
 // error sizes are different, but in general case they are not larger than 256.
 int process_error(char** pg_answer, int* size_pg_answer, ErrorType type) {
     ereport(INFO, errmsg("IN process_error"));
-    *pg_answer = (char*)malloc(256 * sizeof(char));
+    *pg_answer = (char*)malloc(MAX_ERROR_SIZE * sizeof(char));
     (*pg_answer)[0] = 1;
 
     if (type == ERROR_COMMAND_NOT_FOUND) {
-        const char* const error_message = "syntax error";
+        const char* const error_message = "unknown command";
         
         ereport(NOTICE, errmsg("Process command not found error"));
         *size_pg_answer = 1 + strlen(error_message);
@@ -167,8 +165,7 @@ int process_error(char** pg_answer, int* size_pg_answer, ErrorType type) {
 }
 
 
-void
-to_big_case(char* string) {
+void to_big_case(char* string) {
     for (int i = 0; i < strlen(string); ++i) {
         if (string[i] >= 'a' && string[i] <= 'z'){
             string[i] = string[i] + ('A' - 'a');
@@ -181,8 +178,7 @@ to_big_case(char* string) {
  * basic cases ("get", "set", etc.)
  * TODO: all commands. Or as many commands as possible
  */
-int
-process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
+int process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
     ereport(LOG, errmsg("PROCESSING STARTED %d", command_argc));
     if (command_argc == 0) {
         return -1; // nothing to process to db

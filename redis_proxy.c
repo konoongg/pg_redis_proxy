@@ -42,8 +42,7 @@ static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 // ProxyConfiguration config;
 
 
-static void
-on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
+static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     int byte_write;
     Tsocket_data* socket_data = (Tsocket_data*)io_handle->data;
     Tsocket_write_data* write_info = &(socket_data->write_data);
@@ -63,8 +62,7 @@ on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     }
 }
 
-static void
-on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
+static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
     Tsocket_data* socket_data;
     Tsocket_write_data* write_info;
     Tsocket_read_data* read_info;
@@ -141,8 +139,7 @@ on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
     free(rd_answer);
 }
 
-static void
-on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
+static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     int socket_fd = -1;
     struct ev_io* read_io_handle;
     struct ev_io* write_io_handle;
@@ -186,13 +183,11 @@ on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     ev_io_init(write_io_handle, on_write_cb, socket_fd, EV_WRITE);
 }
 
-void
-_PG_init(void){
+void _PG_init(void){
     register_proxy();
 }
 
-static void
-register_proxy(void){
+static void register_proxy(void){
     BackgroundWorker worker;
     memset(&worker, 0, sizeof(BackgroundWorker));
     worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
@@ -204,8 +199,7 @@ register_proxy(void){
     RegisterBackgroundWorker(&worker);
 }
 
-void
-proxy_start_work(Datum main_arg){
+void proxy_start_work(Datum main_arg){
     struct ev_io* accept_io_handle;
     int listen_socket;
     int opt;

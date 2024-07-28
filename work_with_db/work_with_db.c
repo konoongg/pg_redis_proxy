@@ -16,18 +16,15 @@ PGconn* conn;
 PGresult* res = NULL;
 bool connected = false;
 
-// extern ProxyConfiguration config;
-
 // this function tries to connect to postgres database as current user
-int
-init_work_with_db(void){
+int init_work_with_db(void){
     char connect[200];
     if (sprintf(connect, "user=%s dbname=postgres", getlogin()) < 0) {
         ereport(ERROR, errmsg( "sprintf err"));
         PQfinish(conn);
         return -1;
     }
-    // if (config.loglevel >= LOG_VERBOSE) ereport(LOG, errmsg("start work with db"));
+    ereport(INFO, errmsg("start work with db"));
     conn = PQconnectdb(connect);
     if (PQstatus(conn) == CONNECTION_BAD) {
         ereport(ERROR, errmsg( "Connection to database failed: %s", PQerrorMessage(conn)));
@@ -43,27 +40,26 @@ init_work_with_db(void){
  * key stores redis-like key, char** value is a pointer to result string (value from db)
  * and length should store length of value + 1 (for \0)
 */
-req_result
-get_value(char* table, char* key, char** value, int* length){
+req_result get_value(char* table, char* key, char** value, int* length){
     char SELECT[200];
     int n_rows;
     if(!connected){
         ereport(ERROR, errmsg("get_value: not connected with db"));
         return ERR_REQ;
     }
-    ereport(LOG, errmsg("SELECT: %s", table));
+    ereport(INFO, errmsg("SELECT: %s", table));
     if (sprintf(SELECT, "SELECT h['%s'] FROM %s", key, table) < 0) {
         ereport(ERROR, errmsg( "sprintf err"));
         return finish_abnormally();
     }
     res = PQexec(conn, SELECT); // execution
-    ereport(LOG, errmsg("select send %s", SELECT));
+    ereport(INFO, errmsg("select send %s", SELECT));
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         ereport(ERROR, errmsg("select table failed: %s", PQerrorMessage(conn)));
         return finish_abnormally();
     }
     n_rows = PQntuples(res);
-    ereport(LOG, errmsg("COUNT ROWS %d count column: %d", n_rows, PQnfields(res)));
+    ereport(INFO, errmsg("COUNT ROWS %d count column: %d", n_rows, PQnfields(res)));
     if(n_rows > 1){
         ereport(ERROR, errmsg("get_value: more than one value"));
         return ERR_REQ;
@@ -78,8 +74,7 @@ get_value(char* table, char* key, char** value, int* length){
     return OK;
 }
 
-req_result
-set_value(char* table, char* key, char* value){
+req_result set_value(char* table, char* key, char* value){
     char INSERT[200];
     if(!connected){
         ereport(ERROR, errmsg("set_value: not connected with bd"));
@@ -101,8 +96,7 @@ set_value(char* table, char* key, char* value){
 
 // deletes one key from table
 // should return NON if no keys were deleted
-req_result
-del_value(char* table, char* key){
+req_result del_value(char* table, char* key){
     char FIND[200];
     char DELETE[200];
     int n_rows;
@@ -151,8 +145,7 @@ del_value(char* table, char* key){
     return OK;
 }
 
-req_result
-get_table_name(char*** tables_name, int* n_rows){
+req_result get_table_name(char*** tables_name, int* n_rows){
     char GET_TABLES[] = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
     if(!connected){
         ereport(ERROR, errmsg("set_value: not connected with bd"));
@@ -174,8 +167,7 @@ get_table_name(char*** tables_name, int* n_rows){
 
 // creates table in PostgreSQL database.
 // h is a key-value structure for strings
-req_result
-create_table(char* new_table_name){
+req_result create_table(char* new_table_name){
     char CREATE_TABLE[100];
     char CREATE_HSTORE[100];
 
@@ -204,16 +196,14 @@ create_table(char* new_table_name){
     return OK;
 }
 
-void
-finish_work_with_db(void){
+void finish_work_with_db(void){
     connected = false;
     ereport(LOG, errmsg("finish work with db"));
     PQclear(res);
     PQfinish(conn);
 }
 
-inline req_result
-finish_abnormally() {
+inline req_result finish_abnormally() {
     ereport(ERROR, errmsg("Finished wirk with db abnormally"));
     PQclear(res);
     PQfinish(conn);

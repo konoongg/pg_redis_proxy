@@ -1,5 +1,7 @@
 #pragma once
 
+#define MAX_ERROR_SIZE (256)
+
 enum ErrorType {
     ERROR_COMMAND_NOT_FOUND,
     ERROR_WRONG_ARGUMENTS_COUNT

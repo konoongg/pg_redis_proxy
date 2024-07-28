@@ -70,9 +70,10 @@ my %uncorrect_resp_tests = (
 );
 
 #tests with incorrect commands/incorrect arguments
+# in our case its easier to use just "-ERR unknown command", I don't think that it will make user experience much worse.
 my %correct_resp_tests = (
-	"*1\r\n\$32\r\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n" => "-ERR unknown command `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`, with args beginning with: \r\n",
-	"*1\r\n\$5\r\neidkc\r\n" => "-ERR unknown command `eidkc`, with args beginning with: \r\n",
+	"*1\r\n\$32\r\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n" => "-ERR unknown command\r\n",
+	"*1\r\n\$5\r\neidkc\r\n" => "-ERR unknown command\r\n",
 );
 ####################################################################################################################################################################################
 # Block 1: basic commands (get/set/del)
@@ -312,12 +313,12 @@ ok($response eq ":1\r\n", "DEL test: del one of two (second)");
 
 # Block 3.2: correct according to RESP protocol, but still must cause errors
 
-# for (keys %correct_resp_tests) {
-# 	$socket->send($_);
-# 	$socket->recv($response, 1024);
-# 	# print("Response: $response, Cur: $_, Expected result: $correct_resp_tests{$_}\n");
-# 	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
-# }
+for (keys %correct_resp_tests) {
+	$socket->send($_);
+	$socket->recv($response, 1024);
+	print("Response: $response, Cur: $_, Expected result: $correct_resp_tests{$_}\n");
+	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
+}
 
 # Block 4: misc
 
