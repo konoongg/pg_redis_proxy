@@ -154,17 +154,24 @@ int init_work_with_db(void){
  * and length should store length of value + 1 (for \0)
 */
 req_result get_value(char* table, char* key, char** value, int* length){
-    char SELECT[200];
+    int select_reqv_size = SELCT_REQV_SIZE + strlen(key) + strlen(table);
+    char* SELECT;
     int n_rows;
     if(!connected){
         ereport(ERROR, errmsg("get_value: not connected with db"));
         return ERR_REQ;
     }
+    SELECT = (char*)malloc((select_reqv_size + 1) * sizeof(char)); // snprintf add \0;
+    if(SELECT == NULL){
+        ereport(ERROR, (errmsg("can't malloc")));
+        return ERR_REQ;
+    }
     //ereport(DEBUG1, errmsg("SELECT: %s", table));
-    if (sprintf(SELECT, "SELECT h['%s'] FROM %s", key, table) < 0) {
-        ereport(ERROR, errmsg( "sprintf err"));
+    if (snprintf(SELECT, select_reqv_size + 1, "SELECT h['%s'] FROM %s;", key, table) != select_reqv_size) {
+        ereport(ERROR, errmsg( "snprintf err select"));
         PQclear(res);
         PQfinish(conn);
+        free(SELECT);
         return ERR_REQ;
     }
     res = PQexec(conn, SELECT); // execution
@@ -173,6 +180,7 @@ req_result get_value(char* table, char* key, char** value, int* length){
         ereport(ERROR, errmsg("select table failed: %s", PQerrorMessage(conn)));
         PQclear(res);
         PQfinish(conn);
+        free(SELECT);
         return ERR_REQ;
     }
     n_rows = PQntuples(res);
@@ -181,31 +189,41 @@ req_result get_value(char* table, char* key, char** value, int* length){
     *length = PQgetlength(res, 0, 0) + 1; // + \0
     if(n_rows > 1){
         ereport(ERROR, errmsg("get_value: more than one value"));
+        free(SELECT);
         return ERR_REQ;
     }
     else if(strcmp(*value, "") == 0){
         *value = NULL;
         ereport(DEBUG1, errmsg("return non"));
+        free(SELECT);
         return NON;
     }
     *value = PQgetvalue(res, 0, 0);
     *length = PQgetlength(res, 0, 0) + 1; // + \0
     ereport(DEBUG1, errmsg("answer:%c  %d size: %d", PQgetvalue(res, 0, 0)[0], PQgetvalue(res, 0, 0)[0], PQntuples(res)));
     ereport(DEBUG1, errmsg("return ok"));
+    free(SELECT);
     return OK;
 }
 
 req_result set_value(char* table, char* key, char* value){
-    char INSERT[200];
+    char* INSERT;
+    int insert_reqv_size = UPDATE_REQV_SIZE + strlen(table) + strlen(key) + strlen(value);
     if(!connected){
         ereport(ERROR, errmsg("set_value: not connected with bd"));
         return ERR_REQ;
     }
+    INSERT = (char*)malloc((insert_reqv_size + 1) * sizeof(char));// snprintf add \0;
+    if(INSERT == NULL){
+        ereport(ERROR, (errmsg("can't malloc")));
+        return ERR_REQ;
+    }
     //ereport(DEBUG1, errmsg("INSERT: %s", table));
-    if (sprintf (INSERT, "UPDATE %s SET h['%s']='%s'", table, key, value) < 0) {
+    if (snprintf (INSERT, insert_reqv_size + 1, "UPDATE %s SET h['%s']='%s';", table, key, value) != insert_reqv_size) {
         ereport (ERROR, errmsg ("sprintf err"));
         PQclear(res);
         PQfinish(conn);
+        free(INSERT);
         return ERR_REQ;
     }
 
@@ -214,35 +232,53 @@ req_result set_value(char* table, char* key, char* value){
         ereport(ERROR, errmsg("Setting element in hstore failed: %s", PQerrorMessage(conn)));
         PQclear(res);
         PQfinish(conn);
+        free(INSERT);
         return ERR_REQ;
     }
+    free(INSERT);
     return OK;
 }
 
 // deletes one key from table
 // should return NON if no keys were deleted
 req_result del_value(char* table, char* key){
-    char FIND[200];
-    char DELETE[200];
+    int size_del_reqv = DELETE_REQV_SIZE + strlen(key) + strlen(table);
+    int size_find_reqv = FIND_REQV_SIZE + strlen(key) + strlen(table);
+    char* DELETE = NULL;
+    char* FIND = NULL;
     int n_rows;
     //ereport(DEBUG1, errmsg("del_value: entered function"));
     if (!connected) {
         ereport(ERROR, errmsg("del_value: not connected with db"));
         return ERR_REQ;
     }
-
-    // ===== Filling FIND && DELETE with needed requests =====
-    if (sprintf(DELETE, "UPDATE %s SET h = delete(h, '%s')", table, key) < 0) {
-        ereport(ERROR, errmsg ("sprintf err"));
-        PQclear(res);
-        PQfinish(conn);
+    DELETE = (char*)malloc((size_del_reqv + 1) * sizeof(char));// snprintf add \0;
+    if(DELETE == NULL){
+        ereport(ERROR, (errmsg("can't malloc")));
         return ERR_REQ;
     }
-    //ereport(DEBUG1, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
-    if (sprintf(FIND, "SELECT exist(h, '%s') FROM %s;", key, table) < 0) {
-        ereport(ERROR, errmsg("spritnf err"));
+    // ===== Filling FIND && DELETE with needed requests =====
+    if (snprintf(DELETE, size_del_reqv + 1, "UPDATE %s SET h = delete(h, '%s');", table, key) != size_del_reqv) {
+        ereport(ERROR, errmsg ("snprintf err DELETE"));
         PQclear(res);
         PQfinish(conn);
+        free(DELETE);
+        return ERR_REQ;
+    }
+    FIND = (char*)malloc((size_find_reqv + 1) * sizeof(char));// snprintf add \0;
+    if(FIND == NULL){
+        free(DELETE);
+        ereport(ERROR, (errmsg("can't malloc")));
+        return ERR_REQ;
+    }
+
+    //ereport(DEBUG1, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
+    if (snprintf(FIND, size_find_reqv + 1, "SELECT exist(h, '%s') FROM %s;", key, table) != size_find_reqv) {
+        ereport(ERROR, errmsg("snpritnf err FIND"));
+        PQclear(res);
+        PQfinish(conn);
+        free(DELETE);
+        free(FIND);
         return ERR_REQ;
     }
 
@@ -252,18 +288,23 @@ req_result del_value(char* table, char* key){
         ereport (ERROR, errmsg("FINDING ELEMENT IN HSTORE FAILED"));
         PQclear(res);
         PQfinish(conn);
+        free(DELETE);
+        free(FIND);
         return ERR_REQ;
     }
-
     n_rows = PQntuples(res);
     if (n_rows != 1) {
         ereport(ERROR, errmsg("Incorrect result of exist(h, 'key') command"));
         PQclear(res);
         PQfinish(conn);
+        free(DELETE);
+        free(FIND);
         return ERR_REQ;
     }
     //ereport(DEBUG1, errmsg("Received info on '%s' key existence, answer: %s size: %d", key, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
     if (!strcmp(PQgetvalue(res, 0, 0), "f")){
+        free(DELETE);
+        free(FIND);
         return NON;
     }
 
@@ -272,9 +313,13 @@ req_result del_value(char* table, char* key){
         ereport (ERROR, errmsg("Deleting element in hstore failed: %s", PQerrorMessage(conn)));
         PQclear(res);
         PQfinish(conn);
+        free(DELETE);
+        free(FIND);
         return ERR_REQ;
     }
     //ereport(DEBUG1, errmsg("Deletion finished"));
+    free(DELETE);
+    free(FIND);
     return OK;
 }
 
@@ -303,14 +348,28 @@ req_result get_table_name(char*** tables_name, int* n_rows){
 // creates table in PostgreSQL database.
 // h is a key-value structure for strings
 req_result create_table(char* new_table_name){
-    char CREATE_TABLE[100];
-    char CREATE_HSTORE[100];
-
+    int table_name_size = strlen(new_table_name);
+    int create_t_size = (table_name_size + CREATE_TABLE_REQV_SIZE);
+    int create_h_size = (table_name_size + CREATE_HSTORE_REQV_SIZE);
+    char* CREATE_TABLE = (char*)malloc((create_t_size + 1) * sizeof(char)); // snprintf add \0
+    char* CREATE_HSTORE;
+    if(CREATE_TABLE == NULL){
+        ereport(ERROR, (errmsg("can't malloc")));
+        return ERR_REQ;
+    }
+    CREATE_HSTORE = (char*)malloc((create_h_size + 1) * sizeof(char)); // snprintf add \0;
+    if(CREATE_HSTORE == NULL){
+        ereport(ERROR, (errmsg("can't malloc")));
+        free(CREATE_TABLE);
+        return ERR_REQ;
+    }
     // creating table
     //ereport(DEBUG1 , errmsg( "non db %s - create", new_table_name));
-    if (sprintf(CREATE_TABLE, "CREATE TABLE %s (h hstore)", new_table_name) < 0) {
+    if (snprintf(CREATE_TABLE, create_t_size + 1, "CREATE TABLE %s (h hstore);", new_table_name) != create_t_size) {
         ereport(ERROR, errmsg( "sprintf err"));
         PQfinish(conn);
+        free(CREATE_TABLE);
+        free(CREATE_HSTORE);
         return ERR_REQ;
     }
     res = PQexec(conn, CREATE_TABLE);
@@ -318,13 +377,17 @@ req_result create_table(char* new_table_name){
         ereport(ERROR, errmsg("creating table failed: %s", PQerrorMessage(conn)));
         PQclear(res);
         PQfinish(conn);
+        free(CREATE_TABLE);
+        free(CREATE_HSTORE);
         return ERR_REQ;
     }
 
     // putting hstore into it
-    if (sprintf(CREATE_HSTORE, "INSERT INTO %s VALUES ('')", new_table_name) < 0) {
+    if (snprintf(CREATE_HSTORE, create_h_size + 1, "INSERT INTO %s VALUES ('');", new_table_name) != create_h_size) {
         ereport(ERROR, errmsg("sprintf err"));
         PQfinish(conn);
+        free(CREATE_TABLE);
+        free(CREATE_HSTORE);
         return ERR_REQ;
     }
     res = PQexec(conn, CREATE_HSTORE);
@@ -332,8 +395,12 @@ req_result create_table(char* new_table_name){
         ereport (ERROR, errmsg("creating hstore failed: %s", PQerrorMessage(conn)));
         PQclear(res);
         PQfinish(conn);
+        free(CREATE_TABLE);
+        free(CREATE_HSTORE);
         return ERR_REQ;
     }
+    free(CREATE_TABLE);
+    free(CREATE_HSTORE);
     return OK;
 }
 

@@ -40,9 +40,9 @@ int CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         count_shell_sym = 1 + count_write_sym + 2; // 1 - $; count_write_sym - size; 2 - /r/n after size;
     }
     else{
-        count_write_sym = sprintf(size, "%ld", size_reqv_data);
+        count_write_sym = snprintf(size, 20, "%ld", size_reqv_data);
         if (count_write_sym < 0) {
-            ereport(ERROR, errmsg( "sprintf err"));
+            ereport(ERROR, errmsg( "snprintf err"));
             return -1;
         }
         count_shell_sym = 1 + count_write_sym + 2 + 2;  // 1 - $; count_write_sym - size; 2 - /r/n after size; 2 = /r/n after data;

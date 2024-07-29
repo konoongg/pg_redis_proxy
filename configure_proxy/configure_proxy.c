@@ -32,7 +32,7 @@ int init_proxy_status(void){
     proxy_configure = (proxy_status*) malloc(sizeof(proxy_status));
     memcpy(proxy_configure->cur_table_name, "redis_0", 8);
     proxy_configure->cur_table_num = 0;
-    proxy_configure->caching = DEFFER_DUMP;
+    proxy_configure->caching = ONLY_CACHE;
     proxy_configure->dump_time = 1;
     return 0;
 }

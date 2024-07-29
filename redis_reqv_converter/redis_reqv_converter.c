@@ -76,7 +76,7 @@ int process_del(int command_argc, char** command_argv, char** pg_answer, int* si
     int successful_deletions = 0;
     int count_write_sym;
     req_result res;
-    char num[20];
+    char num[20]; // max count symbol for size_t
     //ereport (LOG, errmsg("START DEL, %d arguments", command_argc));
     // 0'th arg is "DEL", its ignored.
     for (int i = 1; i < command_argc; ++i) {
@@ -92,9 +92,9 @@ int process_del(int command_argc, char** command_argv, char** pg_answer, int* si
 
     // If more than 9 values deleted, it will constantly return 9
     // couldn't make it easier
-    count_write_sym = sprintf(num, "%d", successful_deletions);
+    count_write_sym = snprintf(num, 20, "%d", successful_deletions);
     if (count_write_sym < 0) {
-        ereport(ERROR, errmsg( "sprintf err"));
+        ereport(ERROR, errmsg( "snprintf err"));
         return -1;
     }
 
