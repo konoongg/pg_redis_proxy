@@ -17,8 +17,7 @@ struct proxy_status* proxy_configure;
 const ProxyConfiguration DEFAULT_CONFIG = {6379, 512, 16};
 
 // This function checks if new_table_name is in table_names[n_rows]
-bool
-check_table_existence(char** table_names, char* new_table_name,  int n_rows){
+bool check_table_existence(char** table_names, char* new_table_name,  int n_rows){
     for (int i = 0; i < n_rows; i++) {
         //ereport(LOG, errmsg("%d: check Table name: %s and new table name: %s", i, table_names[i], new_table_name));
         if(strcmp(table_names[i], new_table_name) == 0){
@@ -29,40 +28,34 @@ check_table_existence(char** table_names, char* new_table_name,  int n_rows){
     return false;
 }
 
-int
-init_proxy_status(void){
+int init_proxy_status(void){
     proxy_configure = (proxy_status*) malloc(sizeof(proxy_status));
     memcpy(proxy_configure->cur_table_name, "redis_0", 8);
     proxy_configure->cur_table_num = 0;
-    proxy_configure->cashing = DEFFER_DUMP;
+    proxy_configure->caching = DEFFER_DUMP;
     proxy_configure->dump_time = 1;
     return 0;
 }
 
-int
-get_dump_time(void){
+int get_dump_time(void){
     return proxy_configure->dump_time;
 }
 
-char*
-get_cur_table_name(void){
+char* get_cur_table_name(void){
     return proxy_configure->cur_table_name;
 }
 
-int
-get_cur_table_num(void){
+int get_cur_table_num(void){
     return proxy_configure->cur_table_num;
 }
 
-dump_status
-get_cashing_status(void){
-    return proxy_configure->cashing;
+dump_status get_caching_status(void){
+    return proxy_configure->caching;
 }
 
 // this function checks if all config.db_count tables exist, and if they
 // don't, creates new ones
-int
-init_table(ProxyConfiguration config){
+int init_table(ProxyConfiguration config){
     char** table_names;
     int n_rows;
     //ereport(LOG, errmsg("start init table"));
@@ -95,8 +88,7 @@ init_table(ProxyConfiguration config){
 
 // this function gets information from proxy_configuration.conf file
 // on success returns new configuration, on failure - 1. 
-ProxyConfiguration
-init_configuration(void) {
+ProxyConfiguration init_configuration(void) {
     int integer_parameter_value;
     char parameter_name[50], parameter_value[50];
     FILE* config_file = fopen("redis.conf", "r");

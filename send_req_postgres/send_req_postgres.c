@@ -15,47 +15,49 @@ req_result req_get(char* key, char** value, int* length){
     int table_num;
     bool found;
     req_result res;
-    bool fit_in_cash = strlen(key) + 1 < KEY_SIZE && strlen(*value) + 1 < VALUE_SIZE;
-    if((get_cashing_status() == GET_CASH || get_cashing_status() == ONLY_CASH || get_cashing_status() == DEFFER_DUMP) && fit_in_cash){
+    bool fit_in_cache = strlen(key) + 1 < KEY_SIZE && strlen(*value) + 1 < VALUE_SIZE;
+    if((get_caching_status() == GET_CACHE || get_caching_status() == ONLY_CACHE || get_caching_status() == DEFFER_DUMP) && fit_in_cache){
         table_num = get_cur_table_num();
         (*value) = check_hash_table(table_num, key, &found);
-        //ereport(LOG, (errmsg("RESULT: %s found: %d", *value, found)));
+        //ereport(DEBUG1, (errmsg("RESULT: %s found: %d", *value, found)));
         if(*value != NULL){
-            //ereport(LOG, (errmsg("RETURN OK")));
+            //ereport(DEBUG1, (errmsg("RETURN OK")));
             *length = strlen(*value) + 1;
             return OK;
         }
         else if(found){
-            //ereport(LOG, (errmsg("RETURN NON")));
+            //ereport(DEBUG1, (errmsg("RETURN NON")));
             return NON;
         }
-        //ereport(LOG, (errmsg("go to db: %s %d", *value, found)));
         res = get_value(get_cur_table_name(), key, value, length);
-        if(*value == NULL){
-            ereport(LOG, (errmsg("value is null")));
+        //ereport(DEBUG1, (errmsg("go to db: %s %d", *value, found)));
+        //ereport(DEBUG1, (errmsg("res: %d", res)));
+        if(res == NON){
+            //ereport(DEBUG1, (errmsg("res is NON")));
+            if(set_hash_table(table_num, key, *value, 1) == -1){
+                return ERR_REQ;
+            }
         }
-        else{
-            ereport(LOG, (errmsg("value : %p ", *value)));
-        }
-        if(res != ERR_REQ){
+        else if(res == OK){
+            //ereport(DEBUG1, (errmsg("res is Ok")));
             if(set_hash_table(table_num, key, *value, 0) == -1){
                 return ERR_REQ;
             }
         }
         return res;
     }
-    else if(get_cashing_status() == NO_CASH || !fit_in_cash){
+    else if(get_caching_status() == NO_CACHE || !fit_in_cache){
         return get_value(get_cur_table_name(), key, value, length);
     }
-    ereport(ERROR, (errmsg("undefined cashing status")));
+    ereport(ERROR, (errmsg("undefined caching status")));
     return ERR_REQ;
 }
 
 req_result req_set(char* key, char* value){
     int table_num;
     req_result res;
-    bool fit_in_cash = strlen(key) + 1 < KEY_SIZE && strlen(value) + 1 < VALUE_SIZE;
-    if(get_cashing_status() == GET_CASH && fit_in_cash){
+    bool fit_in_cache = strlen(key) + 1 < KEY_SIZE && strlen(value) + 1 < VALUE_SIZE;
+    if(get_caching_status() == GET_CACHE && fit_in_cache){
         table_num = get_cur_table_num();
         res = set_value(get_cur_table_name(), key, value);
         if(res != ERR_REQ){
@@ -65,30 +67,30 @@ req_result req_set(char* key, char* value){
         }
         return res;
     }
-    else if((get_cashing_status() == ONLY_CASH || get_cashing_status() == DEFFER_DUMP) && fit_in_cash){
+    else if((get_caching_status() == ONLY_CACHE || get_caching_status() == DEFFER_DUMP) && fit_in_cache){
         table_num = get_cur_table_num();
         if (set_hash_table(table_num, key, value, 0) == -1){
             return ERR_REQ;
         }
-        if(get_cashing_status() == DEFFER_DUMP){
+        if(get_caching_status() == DEFFER_DUMP){
             if(add_log(SET, key, value) == -1){
                 return ERR_REQ;
             }
         }
         return OK;
     }
-    else if(get_cashing_status() == NO_CASH || !fit_in_cash){
+    else if(get_caching_status() == NO_CACHE || !fit_in_cache){
         return set_value(get_cur_table_name(), key, value);
     }
-    ereport(ERROR, (errmsg("undefined cashing status")));
+    ereport(ERROR, (errmsg("undefined caching status")));
     return ERR_REQ;
 }
 
 req_result req_del(char* key){
     int table_num;
     req_result res;
-    bool fit_in_cash = strlen(key) + 1 < KEY_SIZE ;
-    if(get_cashing_status() == GET_CASH && fit_in_cash) {
+    bool fit_in_cache = strlen(key) + 1 < KEY_SIZE ;
+    if(get_caching_status() == GET_CACHE && fit_in_cache) {
         table_num = get_cur_table_num();
         res = del_value(get_cur_table_name(), key);
         if(res != ERR_REQ){
@@ -98,40 +100,73 @@ req_result req_del(char* key){
         }
         return res;
     }
-    else if (( get_cashing_status() == ONLY_CASH || get_cashing_status() == DEFFER_DUMP) && fit_in_cash){
+    else if (( get_caching_status() == ONLY_CACHE || get_caching_status() == DEFFER_DUMP) && fit_in_cache){
         bool found = false;
         char* result = NULL;
         table_num = get_cur_table_num();
         result = check_hash_table(table_num, key, &found);
-        if(result != NULL){
-            ereport(LOG, (errmsg("DATA in cash %s", result)));
+        if(result != NULL && found){
+            //ereport(DEBUG1, (errmsg("DATA in cache %s", result)));
             res = OK;
         }
         else if(result == NULL && found){
-            ereport(LOG, (errmsg("NUUL in cash")));
+            //ereport(DEBUG1, (errmsg("NULL in cache")));
             res =  NON;
         }
         else{
-            ereport(LOG, (errmsg("not in cash")));
+            //ereport(DEBUG1, (errmsg("not in cache")));
             res = del_value(get_cur_table_name(), key);
         }
         if (set_hash_table(table_num, key, NULL, 1) == -1){
             return ERR_REQ;
         }
-        if(get_cashing_status() == DEFFER_DUMP){
+        if(get_caching_status() == DEFFER_DUMP){
             if(add_log(DEL, key, NULL) == -1){
                 return ERR_REQ;
             }
         }
         return res;
     }
-    else if(get_cashing_status() == NO_CASH || !fit_in_cash){
+    else if(get_caching_status() == NO_CACHE || !fit_in_cache){
         return del_value(get_cur_table_name(), key);
     }
-    ereport(ERROR, (errmsg("undefined cashing status")));
+    ereport(ERROR, (errmsg("undefined caching status")));
     return ERR_REQ;
 }
 
-req_result sync_with_db(){
-    clear_log();
+req_result sync_with_db(void){
+    char* table_name = get_cur_table_name();
+    size_t table_name_size = strlen(table_name);
+    logger* logger_op = get_logger();
+    operation* cur_op;
+    ereport(DEBUG1, (errmsg("START SYNC")));
+    if(logger_op == NULL){
+        return ERR_REQ;
+    }
+    cur_op = logger_op->first_op;
+    if(cur_op == NULL || logger_op->sum_size_operation == 0){
+        return OK;
+    }
+    if (init_transaction(logger_op->sum_size_operation) == -1){
+        return ERR_REQ;
+    }
+    ereport(DEBUG1, (errmsg("COUNT OPERATION: %ld", logger_op->count_operation)));
+    for(int i = 0; i < logger_op->count_operation; ++i){
+        size_t param_size = cur_op->value_size + cur_op->key_size + table_name_size;
+        ereport(DEBUG1, (errmsg("cur_op->value_size: %ld  cur_op->key_size: %ld  table_name_size: %ld", cur_op->value_size,  cur_op->key_size, table_name_size)));
+        ereport(DEBUG1, (errmsg("i: %d key: %s value: %s", i, cur_op->key, cur_op->value )));
+        if(add_op_in_transaction(cur_op->op_name, param_size, cur_op->key, cur_op->value, table_name) == -1){
+            return ERR_REQ;
+        }
+        cur_op = cur_op->next_op;
+    }
+    if(do_transaction() == ERR_REQ){
+        return ERR_REQ;
+    }
+    free_transaction();
+    if (clear_log() == -1){
+        return ERR_REQ;
+    }
+    ereport(DEBUG1, (errmsg("finish sync_with_db")));
+    return OK;
 }

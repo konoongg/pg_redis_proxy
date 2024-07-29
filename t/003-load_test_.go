@@ -70,7 +70,7 @@ func main(){
         }
         count_threads = number
     }
-    time_wait := 60
+    time_wait := 3
     count_work := make([]int, count_threads)
     for  i := 0; i < count_threads; i++ {
         wg.Add(1)

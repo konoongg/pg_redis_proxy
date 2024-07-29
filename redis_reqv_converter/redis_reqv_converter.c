@@ -17,8 +17,7 @@
 
 
 // get orginally receives one arg, its char* key. pg_answer stores response from postgres 
-int
-process_get(char* key, char** pg_answer, int* size_pg_answer){
+int process_get(char* key, char** pg_answer, int* size_pg_answer){
     char* value;
     int length_value = 0;
     req_result res = req_get(key, &value, &length_value);
@@ -50,8 +49,7 @@ process_get(char* key, char** pg_answer, int* size_pg_answer){
 }
 
 // should return +OK (or smth like that) if it worked
-int
-process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
+int process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
     req_result res = req_set(key, value);
     //ereport(LOG, errmsg("START SET"));
     if(res == ERR_REQ){
@@ -74,8 +72,7 @@ process_set(char* key, char* value, char** pg_answer, int* size_pg_answer){
     return 0;
 }
 
-int
-process_del(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
+int process_del(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
     int successful_deletions = 0;
     int count_write_sym;
     req_result res;
@@ -95,7 +92,6 @@ process_del(int command_argc, char** command_argv, char** pg_answer, int* size_p
 
     // If more than 9 values deleted, it will constantly return 9
     // couldn't make it easier
-
     count_write_sym = sprintf(num, "%d", successful_deletions);
     if (count_write_sym < 0) {
         ereport(ERROR, errmsg( "sprintf err"));
@@ -110,12 +106,11 @@ process_del(int command_argc, char** command_argv, char** pg_answer, int* size_p
     }
     (*pg_answer)[0] = 2;
     memcpy((*pg_answer) + 1, num, count_write_sym);
-    //ereport(LOG, errmsg("FINISH DEL"));
+    //ereport(LOG, errmsg("FINISH DEL, answer: %s", *pg_answer));
     return 0;
 }
 
-int
-process_ping(char** pg_answer, int* size_pg_answer){
+int process_ping(char** pg_answer, int* size_pg_answer){
     //ereport(LOG, errmsg("IN process_ping"));
     *pg_answer = (char*)malloc( 6 * sizeof(char));
     if(*pg_answer == NULL){
@@ -133,16 +128,14 @@ process_ping(char** pg_answer, int* size_pg_answer){
     return 0;
 }
 
-int
-process_command(int command_argc, char** command_argv) {
+int process_command(int command_argc, char** command_argv) {
     //ereport(LOG, errmsg("IN process_command"));
     return 0;// plug
     // or better: this should return something like "$3\r\n(all commands supported)\r\n"
 }
 
 
-void
-to_big_case(char* string) {
+void to_big_case(char* string) {
     for (int i = 0; i < strlen(string); ++i) {
         if (string[i] >= 'a' && string[i] <= 'z'){
             string[i] = string[i] + ('A' - 'a');
@@ -155,8 +148,7 @@ to_big_case(char* string) {
  * basic cases ("get", "set", etc.)
  * TODO: all commands. Or as many commands as possible
  */
-int
-process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
+int process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
     //ereport(LOG, errmsg("PROCESSING STARTED %d", command_argc));
     if (command_argc == 0) {
         return -1; // nothing to process to db

@@ -9,3 +9,9 @@ echo "004-load_test.py - creates 100 connections, each of which does connect, se
 ./004-load_test.py
 echo "005-load_test_.go - creates 100 connections, each of which does set, get, del in a loop, and do connect and disconnect not in a loop (take a count threads)"
 go run 005-load_test_.go 1
+echo "006-load_test_.go get test 1 threads"
+go run 006-load_test_.go 1 get
+echo "006-load_test_.go set test 1 threads"
+go run 005-load_test_.go 1 set
+echo "006-load_test_.go del test 1 threads"
+go run 005-load_test_.go 1 del

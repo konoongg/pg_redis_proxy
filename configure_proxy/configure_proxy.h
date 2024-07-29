@@ -8,16 +8,16 @@
 // #define DEFAULT_DB_COUNT        (16)
 
 enum dump_status{
-    NO_CASH, // no cash
-    GET_CASH, // only get in a cash, set and del in db
-    ONLY_CASH, // dont do dump in db
+    NO_CACHE, // no cash
+    GET_CACHE, // only get in a cash, set and del in db
+    ONLY_CACHE, // dont do dump in db
     DEFFER_DUMP //
 } typedef dump_status;
 
 struct proxy_status{
     char cur_table_name[100];
     int cur_table_num;
-    dump_status cashing;
+    dump_status caching;
     int dump_time; //  dump time interval in sec
 } typedef proxy_status;
 
@@ -36,4 +36,4 @@ int get_count_table(void);
 int get_dump_time(void);
 int init_proxy_status(void);
 ProxyConfiguration init_configuration(void);
-dump_status get_cashing_status(void);
+dump_status get_caching_status(void);

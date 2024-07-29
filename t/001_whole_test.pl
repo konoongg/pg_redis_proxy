@@ -277,6 +277,26 @@ $socket->recv($response, 1024);
 ok($response eq ":1\r\n", "DEL test: del one of two (second)");
 ######################################################################################################################################################################################################################
 
+#del two set and two del
+$request = "*3\r\n\$3\r\nset\r\n\$1\r\nr\r\n\$1\r\nr\r\n'";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*3\r\n\$3\r\nset\r\n\$2\r\nrr\r\n\$2\r\nrr\r\n'";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*2\r\n\$3\r\ndel\r\n\$1\r\nr\r\n'";
+$socket->send($request);
+$socket->recv($response, 1024);
+
+$request = "*2\r\n\$3\r\ndel\r\n\$1\r\nr\r\n";
+$socket->send($request);
+$socket->recv($response, 1024);
+ok($response eq ":0\r\n", "del two set and two del");
+######################################################################################################################################################################################################################
+
+
 #ping test
 $request = "*1\r\n\$4\r\nping\r\n";
 $socket->send($request);
