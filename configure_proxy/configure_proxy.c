@@ -36,7 +36,7 @@ int init_proxy_status(void){
     }
     memcpy(proxy_configure->cur_table_name, "redis_0", 8);
     proxy_configure->cur_table_num = 0;
-    proxy_configure->caching = NO_CACHE;
+    proxy_configure->caching = DEFFER_DUMP;
     proxy_configure->dump_time = 1;
     return 0;
 }
