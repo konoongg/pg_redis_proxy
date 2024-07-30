@@ -25,6 +25,8 @@
 #include "work_with_db/work_with_db.h"
 #include "postgres_reqv_converter/postgres_reqv_converter.h"
 #include "proxy_hash/proxy_hash.h"
+#include "logger/logger.h"
+#include "send_req_postgres/send_req_postgres.h"
 
 #ifdef PG_MODULE_MAGIC
     PG_MODULE_MAGIC;
@@ -40,8 +42,13 @@ static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
 static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 
 
-static void
-on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
+static void on_timer_timeout_cb(EV_P_ struct ev_timer* handle, int revents) {
+    if (sync_with_db() == -1){
+        return;
+    }
+}
+
+static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     int byte_write;
     Tsocket_data* socket_data = (Tsocket_data*)io_handle->data;
     Tsocket_write_data* write_info = &(socket_data->write_data);
@@ -61,8 +68,7 @@ on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     }
 }
 
-static void
-on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
+static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
     Tsocket_data* socket_data;
     Tsocket_write_data* write_info;
     Tsocket_read_data* read_info;
@@ -136,8 +142,7 @@ on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
     free(rd_answer);
 }
 
-static void
-on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
+static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     int socket_fd = -1;
     struct ev_io* read_io_handle;
     struct ev_io* write_io_handle;
@@ -199,9 +204,9 @@ register_proxy(void){
     RegisterBackgroundWorker(&worker);
 }
 
-void
-proxy_start_work(Datum main_arg){
+void proxy_start_work(Datum main_arg){
     struct ev_io* accept_io_handle;
+    struct ev_timer timer_handle;
     int listen_socket;
     int opt;
     struct sockaddr_in sockaddr;
@@ -274,6 +279,11 @@ proxy_start_work(Datum main_arg){
         ev_loop_destroy(loop);
         return;
     }
+    if(get_caching_status() == DEFFER_DUMP){
+        init_logger();
+        ev_timer_init(&timer_handle, on_timer_timeout_cb, get_dump_time(), get_dump_time());
+        ev_timer_start(loop, &timer_handle);
+    }
     ev_io_init(accept_io_handle, on_accept_cb, listen_socket, EV_READ);
     ev_io_start(loop, accept_io_handle);
     //ereport(LOG, errmsg("EV_IO START"));
@@ -289,4 +299,7 @@ proxy_start_work(Datum main_arg){
     free(accept_io_handle);
     close(listen_socket);
     ev_loop_destroy(loop);
+    if(get_caching_status() == DEFFER_DUMP){
+        free_log();
+    }
 }

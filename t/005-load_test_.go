@@ -80,6 +80,10 @@ func main(){
             }
 
             conn, err := net.Dial("tcp", "localhost:6379")
+            if err != nil {
+                fmt.Printf("Thread %d: Connection failed: %v\n", threadID, err)
+                return
+            }
             timeout := time.After(time.Duration(time_wait) * time.Second)
             for {
                 select {
@@ -87,10 +91,6 @@ func main(){
                         //fmt.Printf("Thread %d: Timed out after %d seconds\n", threadID, time_wait)
                         return
                     default:
-                        if err != nil {
-                            fmt.Printf("Thread %d: Connection failed: %v\n", threadID, err)
-                            return
-                        }
                         if send(conn, []byte(setReq), []byte("+OK\r\n")) == false{
                             return
                         }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"os"
 	"time"
 	"bytes"
 	"strconv"
@@ -61,7 +62,15 @@ func createReq(parts []string) string {
 func main(){
     var wg sync.WaitGroup
     count_threads := 100
-    time_wait := 60
+    if len(os.Args) >= 2{
+        number, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+            fmt.Printf("can't take args %v\n", err)
+            return
+        }
+        count_threads = number
+    }
+    time_wait := 100
     count_work := make([]int, count_threads)
     for  i := 0; i < count_threads; i++ {
         wg.Add(1)

@@ -11,7 +11,8 @@ OBJS = \
 	work_with_db/work_with_db.o \
 	postgres_reqv_converter/postgres_reqv_converter.o \
 	proxy_hash/proxy_hash.o \
-	send_req_postgres/send_req_postgres.o
+	send_req_postgres/send_req_postgres.o \
+	logger/logger.o
 
 
 EXTENSION = pg_redis_proxy
