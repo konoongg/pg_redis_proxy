@@ -7,6 +7,7 @@
 #include "logger.h"
 #include "../work_with_db/work_with_db.h"
 #include "../configure_proxy/configure_proxy.h"
+#include "../send_req_postgres/send_req_postgres.h"
 
 logger* logger_op = NULL;
 
@@ -87,6 +88,12 @@ int add_log(operation_name op_name, char* key, char* value){
         ereport(DEBUG1, errmsg("DELETE_REQV_SIZE %d",DELETE_REQV_SIZE));
     }
     logger_op->count_operation++;
+    //If the number of operations exceeds the maximum, perform a forced synchronization with the database
+    if(logger_op->count_operation == MAX_COUNT_OPERATION){
+        if (sync_with_db() == -1){
+            return -1;
+        }
+    }
     ereport(DEBUG1, errmsg("finish_log"));
     return 0;
 }

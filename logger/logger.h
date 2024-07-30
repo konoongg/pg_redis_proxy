@@ -2,6 +2,8 @@
 
 #include "../proxy_hash/proxy_hash.h"
 
+#define MAX_COUNT_OPERATION 10000
+
 enum operation_name{
     SET,
     DEL
