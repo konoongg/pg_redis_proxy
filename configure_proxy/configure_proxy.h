@@ -7,6 +7,16 @@
 // #define DEFAULT_BACKLOG_SIZE    (512)
 // #define DEFAULT_DB_COUNT        (16)
 
+
+/*
+ * Database synchronization states:
+ * NO_CACHE: No cache is present.
+ * GET_CACHE: Only GET requests are cached, all other requests are immediately sent to the database.
+ * ONLY_CACHE: All requests go through the cache, and the cache is not synchronized with the database.
+ * DEFER_DUMP: Values are initially stored in the cache, and then after a specified interval (proxy_configure->dump_time),
+ * synchronization with the database is performed.
+ * All modes assume that if a value is not found in the cache, the request is sent to the database.
+ * */
 enum dump_status{
     NO_CACHE, // no cash
     GET_CACHE, // only get in a cash, set and del in db

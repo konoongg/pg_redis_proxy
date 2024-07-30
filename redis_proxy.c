@@ -43,7 +43,9 @@ static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 
 
 static void on_timer_timeout_cb(EV_P_ struct ev_timer* handle, int revents) {
-    sync_with_db();
+    if (sync_with_db() == -1){
+        return;
+    }
 }
 
 static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){

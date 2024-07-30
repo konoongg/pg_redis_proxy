@@ -19,6 +19,7 @@ char* transaction = NULL;
 int cur_position = 0;
 size_t full_transaction_size;
 
+//Initializes the creation of a transaction, allocates the necessary memory space for the transaction.
 int init_transaction(size_t transaction_size){
     full_transaction_size = transaction_size + TRANSACTION_REQV_SIZE  + 1; // add \0;
     transaction = (char*) malloc(full_transaction_size * sizeof(char));
@@ -33,6 +34,11 @@ int init_transaction(size_t transaction_size){
     return 0;
 }
 
+/*
+ * Adds a set command to the transaction for the key 'key' from the table named table_name,
+ * with the transaction size anticipating a trailing semicolon at the end,
+ * as the transaction may contain multiple operations.
+ */
 int add_set(int param_size, char* key, char* value, char* table_name){
     size_t reqv_size = UPDATE_REQV_SIZE + param_size;
     char* UPDATE = (char*)malloc((reqv_size + 1) * sizeof(char)); // snprintf add  \0
@@ -58,6 +64,11 @@ int add_set(int param_size, char* key, char* value, char* table_name){
     return 0;
 }
 
+/*
+ * Adds a delete command to the transaction for the key 'key' from the table named table_name,
+ * with the transaction size anticipating a trailing semicolon at the end,
+ * as the transaction may contain multiple operations.
+ */
 int add_del(int param_size, char* key, char* table_name){
     size_t reqv_size = DELETE_REQV_SIZE + param_size;
     char* DELETE = (char*)malloc((reqv_size + 1) * sizeof(char)); // snprintf add  \0
@@ -82,7 +93,7 @@ int add_del(int param_size, char* key, char* table_name){
     return 0;
 }
 
-//adds the passed command to the transaction
+//Adds a specific operation to the transaction based on the op_name.
 // param_size - it is size key, value, table_name
 int add_op_in_transaction(operation_name op_name, int param_size, char* key, char* value, char* table_name){
     if(transaction == NULL){
@@ -101,7 +112,7 @@ int add_op_in_transaction(operation_name op_name, int param_size, char* key, cha
         return -1;
     }
 }
-
+//Finalizes the transaction by appending a COMMIT; statement and sends it for execution.
 req_result do_transaction(void){
     if(!connected){
         ereport(ERROR, errmsg("do_transaction: not connected with db"));
@@ -109,8 +120,10 @@ req_result do_transaction(void){
     }
     memcpy(transaction + cur_position, "COMMIT;", COMMIT_REQV_SIZE);
     transaction[full_transaction_size - 1] = '\0';
-    ereport(LOG, (errmsg("transaction: %s : %ld ", transaction, full_transaction_size)));
+    ereport(DEBUG1, (errmsg("transaction: %s : %ld ", transaction, full_transaction_size)));
+    ereport(LOG, (errmsg("start do transaction ")));
     res = PQexec(conn, transaction);
+    ereport(LOG, (errmsg("finish transaction")));
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         ereport(ERROR, errmsg("Setting element in hstore failed: %s", PQerrorMessage(conn)));
         PQclear(res);
@@ -118,10 +131,10 @@ req_result do_transaction(void){
         free_transaction();
         return ERR_REQ;
     }
-    ereport(DEBUG1, (errmsg("finish transaction: %s", transaction)));
     return OK;
 }
 
+//Frees the memory allocated for the transaction.
 void free_transaction(void){
     ereport(DEBUG1, (errmsg("free transaction: %s", transaction)));
     cur_position = 0;

@@ -30,9 +30,13 @@ bool check_table_existence(char** table_names, char* new_table_name,  int n_rows
 
 int init_proxy_status(void){
     proxy_configure = (proxy_status*) malloc(sizeof(proxy_status));
+    if(proxy_configure == NULL){
+        ereport(ERROR, errmsg("can't malloc proxy_configure"));
+        return -1;
+    }
     memcpy(proxy_configure->cur_table_name, "redis_0", 8);
     proxy_configure->cur_table_num = 0;
-    proxy_configure->caching = ONLY_CACHE;
+    proxy_configure->caching = DEFFER_DUMP;
     proxy_configure->dump_time = 1;
     return 0;
 }

@@ -14,7 +14,7 @@ int init_hashes(int count_table){
     count_hash_table = count_table;
     hashes = (HTAB**)malloc(count_table * sizeof(HTAB*));
     if(hashes == NULL){
-        ereport(ERROR, (errmsg("can't malloc")));
+        ereport(ERROR, (errmsg("can't malloc hashes")));
         return -1;
     }
     return 0;

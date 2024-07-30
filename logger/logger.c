@@ -11,11 +11,11 @@
 
 logger* logger_op = NULL;
 
-//start work with logger
+//start work with logger, create logger_op
 int init_logger(void){
     logger_op = (logger*)malloc(sizeof(logger));
     if(logger_op == NULL){
-        ereport(ERROR, errmsg("can't malloc"));
+        ereport(ERROR, errmsg("can't malloc logger_op"));
         return -1;
     }
     logger_op->cur_op = NULL;
@@ -25,7 +25,13 @@ int init_logger(void){
     return 0;
 }
 
-// create new log with new operation
+/*
+ * Adding a new entry to the operations log:
+ * If there are already created nodes, their contents are overwritten.
+ * If there is no next node, it is created and becomes the current node,
+ * and data is written into it. If there is no current node, it is created,
+ * and data is written into it.
+ * */
 int add_log(operation_name op_name, char* key, char* value){
     ereport(DEBUG1, errmsg("add_log %ld op_name: %d", logger_op->count_operation, op_name));
     if(logger_op == NULL){
@@ -36,7 +42,7 @@ int add_log(operation_name op_name, char* key, char* value){
         ereport(DEBUG1, errmsg("create op"));
         logger_op->cur_op = (operation*)malloc(sizeof(operation));
         if(logger_op->cur_op == NULL){
-            ereport(ERROR, errmsg("can't malloc"));
+            ereport(ERROR, errmsg("can't malloc logger_op->cur_op"));
             return -1;
         }
         if(logger_op->first_op == NULL){
@@ -44,11 +50,12 @@ int add_log(operation_name op_name, char* key, char* value){
         }
         logger_op->cur_op->next_op = NULL;
     }
+    // if logger_op->sum_size_operation != 0, it is not first operation
     else if (logger_op->cur_op->next_op == NULL && logger_op->sum_size_operation != 0 ){
         ereport(DEBUG1, errmsg("create next op"));
         logger_op->cur_op->next_op = (operation*)malloc(sizeof(operation));
         if(logger_op->cur_op == NULL){
-            ereport(ERROR, errmsg("can't malloc"));
+            ereport(ERROR, errmsg("can't malloc logger_op->cur_op->next_op "));
             return -1;
         }
         logger_op->cur_op = logger_op->cur_op->next_op;
@@ -57,9 +64,6 @@ int add_log(operation_name op_name, char* key, char* value){
     else if (logger_op->sum_size_operation != 0){
         ereport(DEBUG1, errmsg("logger_op->sum_size_operation is NOT  0"));
         logger_op->cur_op = logger_op->cur_op->next_op;
-    }
-    else{
-        ereport(DEBUG1, errmsg("logger_op->sum_size_operation is 0"));
     }
     logger_op->cur_op->op_name = op_name;
     logger_op->cur_op->key_size = strlen(key);
@@ -98,6 +102,13 @@ int add_log(operation_name op_name, char* key, char* value){
     return 0;
 }
 
+/*
+ * To avoid allocating memory each time an operation occurs,
+ *  previously allocated nodes are not freed.
+ *  The operations pointer is reset to the first element of the queue,
+ *  and values are overwritten. New memory will only be allocated
+ *  if there are more operations than in the previous instance.
+ *  */
 int clear_log(void){
     if(logger_op == NULL){
         ereport(ERROR, errmsg("logger not exist"));

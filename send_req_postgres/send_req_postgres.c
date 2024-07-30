@@ -11,10 +11,15 @@
 #include "../proxy_hash/proxy_hash.h"
 #include "../logger/logger.h"
 
+/*
+ * Accepts a request to retrieve an element and, depending on the caching mode,
+ * interacts with either the cache or the database.
+ */
 req_result req_get(char* key, char** value, int* length){
     int table_num;
     bool found;
     req_result res;
+    //If the request is too large to fit into the cache, we send it directly to the database.
     bool fit_in_cache = strlen(key) + 1 < KEY_SIZE && strlen(*value) + 1 < VALUE_SIZE;
     if((get_caching_status() == GET_CACHE || get_caching_status() == ONLY_CACHE || get_caching_status() == DEFFER_DUMP) && fit_in_cache){
         table_num = get_cur_table_num();
@@ -53,9 +58,14 @@ req_result req_get(char* key, char** value, int* length){
     return ERR_REQ;
 }
 
+/*
+ * Accepts a request to modify an element and, depending on the caching mode,
+ * interacts with either the cache or the database.
+ */
 req_result req_set(char* key, char* value){
     int table_num;
     req_result res;
+    //If the request is too large to fit into the cache, we send it directly to the database.
     bool fit_in_cache = strlen(key) + 1 < KEY_SIZE && strlen(value) + 1 < VALUE_SIZE;
     if(get_caching_status() == GET_CACHE && fit_in_cache){
         table_num = get_cur_table_num();
@@ -86,9 +96,14 @@ req_result req_set(char* key, char* value){
     return ERR_REQ;
 }
 
+/*
+ * Accepts a request to delete an element and, depending on the caching mode,
+ * interacts with either the cache or the database
+ */
 req_result req_del(char* key){
     int table_num;
     req_result res;
+    //If the request is too large to fit into the cache, we send it directly to the database.
     bool fit_in_cache = strlen(key) + 1 < KEY_SIZE ;
     if(get_caching_status() == GET_CACHE && fit_in_cache) {
         table_num = get_cur_table_num();
@@ -134,21 +149,23 @@ req_result req_del(char* key){
     return ERR_REQ;
 }
 
-req_result sync_with_db(void){
+//The function is called either when a large number of operations have accumulated or on a timer,
+// and it manages the synchronization with the database.
+int sync_with_db(void){
     char* table_name = get_cur_table_name();
     size_t table_name_size = strlen(table_name);
     logger* logger_op = get_logger();
     operation* cur_op;
     ereport(DEBUG1, (errmsg("START SYNC")));
     if(logger_op == NULL){
-        return ERR_REQ;
+        return -1;
     }
     cur_op = logger_op->first_op;
     if(cur_op == NULL || logger_op->sum_size_operation == 0){
-        return OK;
+        return 0;
     }
     if (init_transaction(logger_op->sum_size_operation) == -1){
-        return ERR_REQ;
+        return -1;
     }
     ereport(DEBUG1, (errmsg("COUNT OPERATION: %ld", logger_op->count_operation)));
     for(int i = 0; i < logger_op->count_operation; ++i){
@@ -156,17 +173,17 @@ req_result sync_with_db(void){
         ereport(DEBUG1, (errmsg("cur_op->value_size: %ld  cur_op->key_size: %ld  table_name_size: %ld", cur_op->value_size,  cur_op->key_size, table_name_size)));
         ereport(DEBUG1, (errmsg("i: %d key: %s value: %s", i, cur_op->key, cur_op->value )));
         if(add_op_in_transaction(cur_op->op_name, param_size, cur_op->key, cur_op->value, table_name) == -1){
-            return ERR_REQ;
+            return -1;
         }
         cur_op = cur_op->next_op;
     }
     if(do_transaction() == ERR_REQ){
-        return ERR_REQ;
+        return -1;
     }
     free_transaction();
     if (clear_log() == -1){
-        return ERR_REQ;
+        return -1;
     }
     ereport(DEBUG1, (errmsg("finish sync_with_db")));
-    return OK;
+    return 0;
 }
