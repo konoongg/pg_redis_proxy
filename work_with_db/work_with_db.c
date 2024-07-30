@@ -132,6 +132,10 @@ req_result del_value(char* table, char* key){
         return finish_abnormally();
     }
 
+    // by default, exists() function returns 1 row with value "f" either "t".
+    // if "f" is returned, it means that the element doesn't exist, and this function returns NON
+    // thanks to NON, variable in  the calling function won't be incremented, and 
+    // this makes response redis-compatible.
     ereport(LOG, errmsg("Received info on '%s' key existence, answer: %s size: %d", key, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0)));
     if (!strcmp(PQgetvalue(res, 0, 0), "f"))
         return NON;
