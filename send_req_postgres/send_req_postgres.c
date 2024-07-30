@@ -20,7 +20,7 @@ req_result req_get(char* key, char** value, int* length){
     bool found;
     req_result res;
     //If the request is too large to fit into the cache, we send it directly to the database.
-    bool fit_in_cache = strlen(key) + 1 < KEY_SIZE && strlen(*value) + 1 < VALUE_SIZE;
+    bool fit_in_cache = (strlen(key) + 1 < KEY_SIZE);
     if((get_caching_status() == GET_CACHE || get_caching_status() == ONLY_CACHE || get_caching_status() == DEFFER_DUMP) && fit_in_cache){
         table_num = get_cur_table_num();
         (*value) = check_hash_table(table_num, key, &found);
@@ -43,10 +43,13 @@ req_result req_get(char* key, char** value, int* length){
                 return ERR_REQ;
             }
         }
-        else if(res == OK){
-            //ereport(DEBUG1, (errmsg("res is Ok")));
-            if(set_hash_table(table_num, key, *value, 0) == -1){
-                return ERR_REQ;
+        else if(res == OK ){
+            fit_in_cache = (strlen(*value) + 1 < VALUE_SIZE);
+            if(fit_in_cache){
+                //ereport(DEBUG1, (errmsg("res is Ok")));
+                if(set_hash_table(table_num, key, *value, 0) == -1){
+                    return ERR_REQ;
+                }
             }
         }
         return res;
