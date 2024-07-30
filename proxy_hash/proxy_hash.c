@@ -44,20 +44,16 @@ int create_hash_table(char* table_name, int table_num){
  * */
 char* check_hash_table(int table_num, const char* key, bool* found){
     char* result = hash_search(hashes[table_num], key, HASH_FIND, found);
-    if (result != NULL && found && result[KEY_SIZE] == 2){
-        *found = true;
-        return NULL;
-    }
-    else if(result != NULL && found){
-        //ereport(DEBUG1, (errmsg("get result: %s", (char*)result)));
+    if(result != NULL && found){
+        ereport(DEBUG1, (errmsg("get result: %s", (char*)result)));
         if(result[KEY_SIZE] == 1){
-            *found = false;
+            *found = true;
             return NULL;
         }
         return (char*)result + KEY_SIZE + 1;
     }
     else{
-        //ereport(DEBUG1, (errmsg("TEST NULL")));
+        ereport(DEBUG1, (errmsg("TEST NULL")));
         *found = false;
         return NULL;
     }
@@ -91,7 +87,7 @@ int set_hash_table(int table_num, char* key, char* value, char new_status){
     if(strlen(key) + 1 < KEY_SIZE){
         memset(result + strlen(key) + 1 , 0 , KEY_SIZE - (strlen(key) + 1 ));
     }
-    //ereport(DEBUG1, (errmsg("change status key: %s status: %d", key, new_status)));
+    ereport(DEBUG1, (errmsg("change status key: %s status: %d", key, new_status)));
     result[KEY_SIZE] = new_status;
     if(value != NULL){
         memcpy(result + KEY_SIZE + 1, value, VALUE_SIZE);

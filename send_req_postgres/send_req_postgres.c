@@ -24,21 +24,21 @@ req_result req_get(char* key, char** value, int* length){
     if((get_caching_status() == GET_CACHE || get_caching_status() == ONLY_CACHE || get_caching_status() == DEFFER_DUMP) && fit_in_cache){
         table_num = get_cur_table_num();
         (*value) = check_hash_table(table_num, key, &found);
-        //ereport(DEBUG1, (errmsg("RESULT: %s found: %d", *value, found)));
+        ereport(DEBUG1, (errmsg("RESULT: %s found: %d", *value, found)));
         if(*value != NULL){
-            //ereport(DEBUG1, (errmsg("RETURN OK")));
+            ereport(DEBUG1, (errmsg("RETURN OK")));
             *length = strlen(*value) + 1;
             return OK;
         }
         else if(found){
-            //ereport(DEBUG1, (errmsg("RETURN NON")));
+            ereport(DEBUG1, (errmsg("RETURN NON")));
             return NON;
         }
         res = get_value(get_cur_table_name(), key, value, length);
-        //ereport(DEBUG1, (errmsg("go to db: %s %d", *value, found)));
-        //ereport(DEBUG1, (errmsg("res: %d", res)));
+        ereport(DEBUG1, (errmsg("go to db: %s %d", *value, found)));
+        ereport(DEBUG1, (errmsg("res: %d", res)));
         if(res == NON){
-            //ereport(DEBUG1, (errmsg("res is NON")));
+            ereport(DEBUG1, (errmsg("res is NON")));
             if(set_hash_table(table_num, key, *value, 1) == -1){
                 return ERR_REQ;
             }
@@ -46,10 +46,11 @@ req_result req_get(char* key, char** value, int* length){
         else if(res == OK ){
             fit_in_cache = (strlen(*value) + 1 < VALUE_SIZE);
             if(fit_in_cache){
-                //ereport(DEBUG1, (errmsg("res is Ok")));
+                ereport(DEBUG1, (errmsg("get  value fit_in_cache")));
                 if(set_hash_table(table_num, key, *value, 0) == -1){
                     return ERR_REQ;
                 }
+                ereport(DEBUG1, (errmsg("get value not fit_in_cache")));
             }
         }
         return res;
@@ -124,15 +125,15 @@ req_result req_del(char* key){
         table_num = get_cur_table_num();
         result = check_hash_table(table_num, key, &found);
         if(result != NULL && found){
-            //ereport(DEBUG1, (errmsg("DATA in cache %s", result)));
+            ereport(DEBUG1, (errmsg("DATA in cache %s", result)));
             res = OK;
         }
         else if(result == NULL && found){
-            //ereport(DEBUG1, (errmsg("NULL in cache")));
+            ereport(DEBUG1, (errmsg("NULL in cache")));
             res =  NON;
         }
         else{
-            //ereport(DEBUG1, (errmsg("not in cache")));
+            ereport(DEBUG1, (errmsg("not in cache")));
             res = del_value(get_cur_table_name(), key);
         }
         if (set_hash_table(table_num, key, NULL, 1) == -1){
