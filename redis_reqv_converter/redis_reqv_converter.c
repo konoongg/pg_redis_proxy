@@ -33,9 +33,7 @@ int process_get(char* key, char** pg_answer, int* size_pg_answer){
         *size_pg_answer = 1;
     }
     else if(res == ERR_REQ){
-        if (config.loglevel >= LOG_DEBUG) {
-            ereport(ERROR, errmsg("IN process_get: GET err with key: %s", key));
-        }
+        ereport(ERROR, errmsg("IN process_get: GET err with key: %s", key));
         return -1;
     }
     else{

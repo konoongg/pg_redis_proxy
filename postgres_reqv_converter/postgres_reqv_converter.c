@@ -20,7 +20,7 @@ int CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer
     }
     (*answer)[0] = '+';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
-    (*answer)[(*size_answer)- 1] = '\n';
+    (*answer)[(*size_answer) - 1] = '\n';
     (*answer)[(*size_answer) - 2] = '\r';
     ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
     return 0;

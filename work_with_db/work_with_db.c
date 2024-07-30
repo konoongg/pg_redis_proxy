@@ -42,13 +42,15 @@ int init_work_with_db(void){
 */
 req_result get_value(char* table, char* key, char** value, int* length){
     char SELECT[200];
-    int n_rows;
+    int n_rows, sprintf_result;
     if(!connected){
         ereport(ERROR, errmsg("get_value: not connected with db"));
         return ERR_REQ;
     }
     ereport(INFO, errmsg("SELECT: %s", table));
-    if (sprintf(SELECT, "SELECT h['%s'] FROM %s", key, table) < 0) {
+    sprintf_result = sprintf(SELECT, "SELECT h['%s'] FROM %s", key, table);
+
+    if (sprintf_result < 0 || sprintf_result > 2000) {
         ereport(ERROR, errmsg( "sprintf err"));
         return finish_abnormally();
     }

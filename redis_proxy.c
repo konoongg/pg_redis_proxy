@@ -30,16 +30,11 @@
     PG_MODULE_MAGIC;
 #endif
 
-// #define DEFAULT_PORT            (6379)
-// #define DEFAULT_BACKLOG_SIZE    (512)
-
 
 PGDLLEXPORT void proxy_start_work(Datum main_arg);
 static void register_proxy(void);
 static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
 static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
-
-// ProxyConfiguration config;
 
 
 static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
@@ -209,20 +204,6 @@ void proxy_start_work(Datum main_arg){
 
     init_configuration();
     config = get_configuration();
-
-    // Redis to Postgres log conversion:
-    if (config.loglevel == LOG_NOTHING)
-        log_min_messages = PANIC; // there's no smaller loglevel in postgres
-    else if (config.loglevel == LOG_WARNING)
-        log_min_messages = WARNING;
-    else if (config.loglevel == LOG_NOTICE)
-        log_min_messages = NOTICE;
-    else if (config.loglevel == LOG_VERBOSE)
-        log_min_messages = INFO;
-    else if (config.loglevel == LOG_DEBUG)
-        log_min_messages = DEBUG5;
-    
-    ereport(LOG, errmsg("Parsed loglevel: %u", config.loglevel));
     
     ereport(LOG, errmsg("START WORKER RF"));
 
