@@ -12,6 +12,6 @@ go run 005-load_test_.go 4
 echo "006-load_test_.go get test 4 threads"
 go run 006-load_test_.go get 4
 echo "006-load_test_.go set test 4 threads"
-go run 005-load_test_.go set 4
+go run 006-load_test_.go set 4
 echo "006-load_test_.go del test 4 threads"
-go run 005-load_test_.go del 4
+go run 006-load_test_.go del 4
