@@ -7,6 +7,7 @@ import (
 	"time"
 	"bytes"
 	"strconv"
+	"os"
 )
 
 func send(conn net.Conn, req, answer []byte) bool {
@@ -61,6 +62,14 @@ func createReq(parts []string) string {
 func main(){
     var wg sync.WaitGroup
     count_threads := 100
+    if len(os.Args) >= 2{
+        number, err := strconv.Atoi(os.Args[1])
+        if err != nil {
+            fmt.Printf("can't take args %v\n", err)
+            return
+        }
+        count_threads = number
+    }
     time_wait := 60
     count_work := make([]int, count_threads)
     for  i := 0; i < count_threads; i++ {

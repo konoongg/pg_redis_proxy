@@ -212,13 +212,13 @@ void proxy_start_work(Datum main_arg){
     struct sockaddr_in sockaddr;
     struct ev_loop* loop;
 
-    ProxyConfiguration config = init_configuration();
+    init_configuration();
     //ereport(LOG, errmsg("START WORKER RF"));
     if(init_hashes(config.db_count) == -1){
         ereport(ERROR, errmsg("can't init hashes"));
         return;
     }
-    if(init_table(config) == -1){
+    if(init_table() == -1){
         ereport(ERROR, errmsg("can't init tables"));
         return;
     }
@@ -299,6 +299,7 @@ void proxy_start_work(Datum main_arg){
     free(accept_io_handle);
     close(listen_socket);
     ev_loop_destroy(loop);
+    free_configuration();
     if(get_caching_status() == DEFFER_DUMP){
         free_log();
     }

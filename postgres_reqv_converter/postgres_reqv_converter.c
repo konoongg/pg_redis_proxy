@@ -13,7 +13,7 @@ int CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 2;
     *size_answer = size_reqv_data + count_shell_sym;
-    //ereport(DEBUG1, errmsg("START CreateSimplStr: %s ", reqv));
+    ereport(LOG, errmsg("START CreateSimplStr: %s ", reqv));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
         ereport(ERROR, errmsg("ERROR MALLOC CreateSimplStr answer"));
@@ -21,9 +21,10 @@ int CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer
     }
     (*answer)[0] = '+';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
-    (*answer)[(*size_answer)- 1] = '\n';
-    (*answer)[(*size_answer) - 2] = '\r';
-    //ereport(DEBUG1, errmsg("RESULT CreateSimplStr : %s ", *answer));
+    // (*answer)[(*size_answer) - 1] = '\n';
+    // (*answer)[(*size_answer) - 2] = '\r';
+    memcpy(*answer + *size_answer - 2, "\r\n", 2);
+    ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
     return 0;
 }
 
@@ -34,7 +35,7 @@ int CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     int count_shell_sym = 0;
     size_t size_reqv_data = (size_reqv == 1) ? 0 : size_reqv - 2;
     char size [20]; // max count symbol for size_t
-    //ereport(DEBUG1, errmsg("START CreateStr: %s %ld ", reqv, size_reqv));
+    ereport(LOG, errmsg("START CreateStr: %s %ld ", reqv, size_reqv));
     if(size_reqv_data == 0){
         count_write_sym = 2;
         size[0] = '-';
@@ -50,42 +51,73 @@ int CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
         count_shell_sym = 1 + count_write_sym + 2 + 2;  // 1 - $; count_write_sym - size; 2 - /r/n after size; 2 = /r/n after data;
     }
     *size_answer = size_reqv_data + count_shell_sym;
-    //ereport(DEBUG1, errmsg("size_reqv_data: %ld, count_shell_sym: %d", size_reqv_data, count_shell_sym));
+    ereport(LOG, errmsg("size_reqv_data: %ld, count_shell_sym: %d", size_reqv_data, count_shell_sym));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
-        ereport(ERROR, errmsg("ERROR MALLOC CreateStr: answer"));
+        ereport(LOG, errmsg("ERROR MALLOC"));
         return -1;
     }
     (*answer)[0] = '$';
     memcpy(*answer + 1, size,  count_write_sym);
-    //ereport(DEBUG1, errmsg("CreateStr: %d %d SIZE: %d", 1 + count_write_sym, 1 + count_write_sym + 1,*size_answer ));
+    ereport(LOG, errmsg("CreateStr: %d %d SIZE: %d", 1 + count_write_sym, 1 + count_write_sym + 1,*size_answer ));
     (*answer)[1 + count_write_sym] = '\r';
     (*answer)[1 + count_write_sym + 1] = '\n';
     if(size_reqv_data != 0){
         memcpy(*answer + 1 + count_write_sym + 2, reqv + 1,  size_reqv_data);
-        (*answer)[(*size_answer)- 1] = '\n';
-        (*answer)[(*size_answer) - 2] = '\r';
+        // (*answer)[(*size_answer)- 1] = '\n';
+        // (*answer)[(*size_answer) - 2] = '\r';
+        memcpy(*answer + *size_answer - 2, "\r\n", 2);
     }
-    //ereport(DEBUG1, errmsg("RESULT CreateStr: %s ", *answer));
+    ereport(LOG, errmsg("RESULT CreateStr: %s ", *answer));
     return 0;
 }
 
 //Takes an input of a formatted PostgreSQL response and creates a message in the int format for Redis.
+// the format is :(num)\r\n
 int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     int count_shell_sym = 3;
     int size_reqv_data = size_reqv - 1;
     *size_answer = size_reqv_data + count_shell_sym;
-    //ereport(DEBUG1, errmsg("START CreateInt: %s ", reqv));
+    ereport(LOG, errmsg("START CreateInt: %s ", reqv));
     *answer = (char*)malloc(*size_answer * sizeof(char));
     if(*answer == NULL){
-        ereport(ERROR, errmsg("ERROR MALLOC CreateInt: answer"));
+        ereport(LOG, errmsg("ERROR MALLOC"));
         return -1;
     }
     (*answer)[0] = ':';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
-    (*answer)[(*size_answer)- 1] = '\n';
-    (*answer)[(*size_answer) - 2] = '\r';
-    //ereport(DEBUG1, errmsg("RESULT CreateSimplStr : %s ", *answer));
+    // (*answer)[(*size_answer) - 1] = '\n';
+    // (*answer)[(*size_answer) - 2] = '\r';
+    memcpy(*answer + *size_answer - 2, "\r\n", 2);
+    ereport(LOG, errmsg("RESULT CreateInt : %s ", *answer));
+    return 0;
+}
+
+/*
+  original  error format in Redis looks like that:
+  "-ERR(error_message)\r\n"
+  they always start with -, but not necessary with -ERR:
+  (these are examples from official documentation):
+  -ERR unknown command 'asdf'
+  -WRONGTYPE Operation against a key holding the wrong kind of value
+  this proxy supports only one type(-ERR), and for this reason -WRONGTYPE errors aren't supposed to be supported
+  (and the format of -ERR is simplified comparing to original Redis)
+*/
+int CreateErr(char* reqv, char** answer, size_t size_reqv, int* size_answer) {
+    ereport(NOTICE, errmsg("Start CreateErr: %s ", reqv));
+
+    *size_answer = 5 + size_reqv + 2 - 1; // '-ERR ' + size of error + '\r\n' - 0th char '0x01'
+    *answer = (char*)malloc(*size_answer * sizeof(char));
+    if (*answer == NULL) {
+        ereport(ERROR, errmsg("Couldn't malloc"));
+        return -1;
+    }
+
+    memcpy(*answer, "-ERR ", 5);
+    memcpy(*answer + 5, reqv + 1, size_reqv);
+    memcpy(*answer + *size_answer - 2, "\r\n", 2);
+
+    ereport(NOTICE, errmsg("RESULT CreateErr: %s", *answer));
     return 0;
 }
 
@@ -98,12 +130,12 @@ int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
  * The first byte is the response code, followed by the response from Postgres
  */
 int define_type_req(char* reqv, char** answer, size_t size_reqv, int* size_answer){
-    //ereport(DEBUG1, errmsg("START define_type_req: %d ", reqv[0]));
+    ereport(LOG, errmsg("START define_type_req: %d ", reqv[0]));
     if(reqv[0] == 0){
         return CreateSimplStr(reqv, answer,size_reqv, size_answer);
     }
     else if(reqv[0] == 1){
-        //CreateErr();
+        return CreateErr(reqv, answer, size_reqv, size_answer);
     }
     else if(reqv[0] == 2){
         return CreateInt(reqv, answer, size_reqv, size_answer);

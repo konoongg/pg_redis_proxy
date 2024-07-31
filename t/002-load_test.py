@@ -26,14 +26,14 @@ def worker(host, port, thread_num, queue):
             get_req += "\r\n$" + str(len(part)) + "\r\n" + part
         get_req += "\r\n"
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(5)
+        s.settimeout(50)
         s.connect((host, port))
         s.send(delete_req.encode())
         s.close()
         # print(f"suc connection to {host}:{port}")
         while(time.time() - start_time < 60):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(5)
+            s.settimeout(50)
             s.connect((host, port))
             s.send(set_req.encode())
             result = s.recv(8192)

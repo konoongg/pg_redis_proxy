@@ -9,7 +9,6 @@
 #include "../work_with_db/work_with_db.h"
 #include "../configure_proxy/configure_proxy.h"
 #include "../proxy_hash/proxy_hash.h"
-#include "../logger/logger.h"
 
 /*
  * Accepts a request to retrieve an element and, depending on the caching mode,
