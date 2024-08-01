@@ -5,6 +5,7 @@ A redis proxy extension for postgreSQL database.
 Install dependecies:
 1) libev
 2) libpq
+3) + modules for running Perl TAP tests, if they are not installed
 
 Copy this repo into `$YOUR_PATH_TO_POSTGRES/contrib` folder,
 then "remake" project:
@@ -37,3 +38,19 @@ The proxy supports 4 caching modes, and direct work with PostgreSQL tables is no
 database and the maximum number of operations.
 If a sufficient number of operations have accumulated or the time has elapsed,
 synchronization of the cache with the database occurs.
+
+To use caching on this proxy, you need to set up redis.conf (this file must be located in your
+database folder. 
+
+## Installation of FreeBSD
+This proxy doesn't contain any linux-only modules, for this reason this proxy is also runnable on FreeBSD
+
+To install this proxy on FreeBSD follow these steps:
+1) install dependencies: perl, go, python3, p5-test2-suite, p5-ipc-run, postgresql-libpqxx, readline
+2) Create new role in your database: (the following code may not be secure)
+CREATE ROLE %username% SUPERUSER;!!!!
+ALTER LOGIN!!!!
+3) clone this repo;
+4) copy files of this repo into postgres/contrib/pg_redis_proxy
+5) run server
+6) connect to server, run CREATE EXTENSION pg_redis_proxy;
