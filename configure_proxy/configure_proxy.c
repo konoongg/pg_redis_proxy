@@ -23,7 +23,7 @@ const ProxyConfiguration DEFAULT_CONFIG = {
     NULL,       // log file
     0,          // count of SnapshotData structures 
     NULL,        // SnapshotData array of size ^^^ 
-    DEFFER_DUMP // default caching regime
+    NO_CACHE // default caching regime
 };
 
 ProxyConfiguration config = DEFAULT_CONFIG;
@@ -53,6 +53,7 @@ int init_proxy_status(void){
     return 0;
 }
 
+//These functions are needed to retrieve the current proxy settings.
 int get_dump_time(void){
     return proxy_configure->dump_time;
 }

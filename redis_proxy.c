@@ -41,13 +41,18 @@ static void register_proxy(void);
 static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
 static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 
-
+//It is necessary for tracking time for synchronizing data from the cache and the database,
+// and it only works in the DEFFER_DUMP caching mode.
 static void on_timer_timeout_cb(EV_P_ struct ev_timer* handle, int revents) {
     if (sync_with_db() == -1){
         return;
     }
 }
 
+/*
+ * This function is called when data needs to be written to the socket.
+ * The data is written, and if all necessary data has been written, the write watcher is stopped
+ * */
 static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     int byte_write;
     Tsocket_data* socket_data = (Tsocket_data*)io_handle->data;
@@ -68,6 +73,13 @@ static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     }
 }
 
+/*
+ * This function is called when data arrives for reading in the corresponding socket.
+ * The data is counted, converted to an array of strings containing the called operation and its arguments.
+ * Then, depending on the content of the request, a corresponding request is sent to Postgres, an answer is received from Postgres,
+ * converted to Redis format, and then a watcher is launched for writing information.
+ * All operations are performed until all incoming data is read, which is necessary to process all requests.
+ */
 static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
     Tsocket_data* socket_data;
     Tsocket_write_data* write_info;
@@ -142,6 +154,8 @@ static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
     free(rd_answer);
 }
 
+//When a client connects, a socket is created and two watchers are set up:
+// the first one for reading is always active, and the second one for writing is activated only when data needs to be written.
 static void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     int socket_fd = -1;
     struct ev_io* read_io_handle;

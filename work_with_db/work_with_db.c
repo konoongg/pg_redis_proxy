@@ -395,6 +395,7 @@ req_result create_table(char* new_table_name){
     return OK;
 }
 
+// close libpq connect
 void finish_work_with_db(void){
     connected = false;
     ereport(LOG, errmsg("finish work with db"));

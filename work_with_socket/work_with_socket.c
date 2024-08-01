@@ -63,6 +63,9 @@ int write_data(int fd, char* mes, int count_sum){
  * the function works on the basis of a finite state machine,
  * it takes a character from the buffer and, depending on the state of the machine,
  * performs the necessary actions
+ * The parsing state is preserved if the data arrives incomplete;
+ * the received data will be processed, and the parsing state is saved. When the remaining data arrives,
+ * parsing will continue correctly.
  */
 void parse_cli_mes(Tsocket_read_data* data){
     int cur_buffer_index = 0;
@@ -223,6 +226,7 @@ int get_socket(int fd){
 }
 
 // read data in buffer
+// The buffer has a constant size; if there is more data, it will be read later.
 int read_data(EV_P_ struct ev_io* io_handle, char* read_buffer, int cur_buffer_size){
     int res = read(io_handle->fd, read_buffer + cur_buffer_size, BUFFER_SIZE - cur_buffer_size);
     if (!res || res < 0) {

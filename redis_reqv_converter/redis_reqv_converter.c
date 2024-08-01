@@ -183,7 +183,6 @@ void to_big_case(char* string) {
 /*
  * High-level function which redirects processing of command arguments to
  * basic cases ("get", "set", etc.)
- * TODO: all commands. Or as many commands as possible
  */
 int process_redis_to_postgres(int command_argc, char** command_argv, char** pg_answer, int* size_pg_answer) {
     ereport(LOG, errmsg("PROCESSING STARTED %d", command_argc));
