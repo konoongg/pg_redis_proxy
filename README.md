@@ -5,7 +5,7 @@ A redis proxy extension for postgreSQL database.
 Install dependecies:
 1) libev
 2) libpq
-3) + modules for running Perl TAP tests, if they are not installed
+3) And also consider the installation of modules for running Perl TAP tests, if they are not installed
 
 Copy this repo into `$YOUR_PATH_TO_POSTGRES/contrib` folder,
 then "remake" project:
@@ -47,10 +47,10 @@ This proxy doesn't contain any linux-only modules, for this reason this proxy is
 
 To install this proxy on FreeBSD follow these steps:
 1) install dependencies: perl, go, python3, p5-test2-suite, p5-ipc-run, postgresql-libpqxx, readline
-2) Create new role in your database: (the following code may not be secure)
-CREATE ROLE %username% SUPERUSER;!!!!
-ALTER LOGIN!!!!
-3) clone this repo;
-4) copy files of this repo into postgres/contrib/pg_redis_proxy
-5) run server
-6) connect to server, run CREATE EXTENSION pg_redis_proxy;
+2) Create new role in your database: (the following code is not be secure; you create a role that can do anything to DB)
+CREATE ROLE "your_user_name" SUPERUSER;
+ALTER ROLE "your_user_name" WITH LOGIN;
+4) clone this repo;
+5) copy files of this repo into postgres/contrib/pg_redis_proxy
+6) run server
+7) connect to server, run CREATE EXTENSION pg_redis_proxy;
