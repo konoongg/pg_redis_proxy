@@ -83,14 +83,13 @@ my %correct_resp_tests = (
 
 #1, 2
 for (my $i = 0; $i <= $#set_tests; $i++) {
-	print "OK\n";
     $request = "*2\r\n\$3\r\nDEL\r\n\$3\r\nkey\r\n";
     $socket->send($request);
     $socket->recv($response, 1024);
 
 	$socket->send($set_tests[$i][0]);
 	$socket->recv($response, 1024);
-	print("Response: $response, Cur: $i, Expected $set_tests[$i][1]\n");
+	# print("Response: $response, Cur: $i, Expected $set_tests[$i][1]\n");
 	ok($response eq $set_tests[$i][1], $set_tests[$i][2]);
 }
 
@@ -501,7 +500,7 @@ ok($response eq "+PONG\r\n", "ping test: just PING");
 for (keys %correct_resp_tests) {
 	$socket->send($_);
 	$socket->recv($response, 1024);
-	print("Response: $response, Cur: $_, Expected result: $correct_resp_tests{$_}\n");
+	# print("Response: $response, Cur: $_, Expected result: $correct_resp_tests{$_}\n");
 	ok($response eq $correct_resp_tests{$_}, "Uncorrect commands test");
 }
 
