@@ -40,7 +40,10 @@ If a sufficient number of operations have accumulated or the time has elapsed,
 synchronization of the cache with the database occurs.
 
 To use caching on this proxy, you need to set up redis.conf (this file must be located in your
-database folder. 
+database folder. Add this string to the end of redis.conf file:
+cache-regime (only-cache; get-cache; no-cache; deffer-dump)
+to select one of cache regimes for proxy. The quickest is only-cache, but it doesn't perform
+saving database into PostgreSQL.
 
 ## Installation of FreeBSD
 This proxy doesn't contain any linux-only modules, for this reason this proxy is also runnable on FreeBSD
