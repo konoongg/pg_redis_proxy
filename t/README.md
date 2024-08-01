@@ -20,7 +20,7 @@ sets of operations were performed within a certain period of time.
 but written in Go and as the first parameter, 
 the number of threads that will be created for accessing the port. 
 The test outputs how many such sets of operations 
-were performed within a certain period of time.
+were performed within a certain period of time.(defult count threads = 100)
 
 4) 004-load_test.py - The same test as 002-load_test.py, 
 but with an artificial delay in each set of operations, 
@@ -30,10 +30,10 @@ returns a message about the correctness of the test.
 5) 005-load_test_.go [count threads] - The same test as 003-load_test_.go, 
 but the set of operations does not include connecting to the port and 
 disconnecting from the port. The test outputs how many such sets of operations 
-were performed within a certain period of time.
+were performed within a certain period of time.(defult count threads = 100)
 
 6) 006-load_test_.go <get | set | del> [count threads] - A test aimed at observing
 the performance of specific operations, each operation is applied in a loop, 
 the format of the operation between applications does not change 
 (for example, if it is a delete operation, a request to delete an element 
-with the same key will always be sent).
+with the same key will always be sent).(defult count threads = 100)
