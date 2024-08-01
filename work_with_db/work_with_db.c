@@ -178,7 +178,7 @@ req_result get_value(char* table, char* key, char** value, int* length){
         ereport(ERROR, (errmsg("can't malloc")));
         return ERR_REQ;
     }
-    //ereport(DEBUG1, errmsg("SELECT: %s", table));
+    ereport(DEBUG5, errmsg("SELECT: %s", table));
     if (snprintf(SELECT, select_reqv_size + 1, "SELECT h['%s'] FROM %s;", key, table) != select_reqv_size) {
         ereport(ERROR, errmsg( "snprintf err select"));
         PQclear(res);
@@ -187,14 +187,14 @@ req_result get_value(char* table, char* key, char** value, int* length){
         return ERR_REQ;
     }
     res = PQexec(conn, SELECT); // execution
-    //ereport(DEBUG1, errmsg("select send %s", SELECT));
+    ereport(DEBUG5, errmsg("select send %s", SELECT));
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         ereport(ERROR, errmsg("select table failed: %s", PQerrorMessage(conn)));
         free(SELECT);
         return finish_abnormally();
     }
     n_rows = PQntuples(res);
-    //ereport(DEBUG1, errmsg("COUNT ROWS %d count column: %d", n_rows, PQnfields(res)));
+    ereport(DEBUG5, errmsg("COUNT ROWS %d count column: %d", n_rows, PQnfields(res)));
     *value = PQgetvalue(res, 0, 0);
     *length = PQgetlength(res, 0, 0) + 1; // + \0
     if(n_rows > 1){
@@ -229,7 +229,7 @@ req_result set_value(char* table, char* key, char* value){
         ereport(ERROR, (errmsg("can't malloc")));
         return ERR_REQ;
     }
-    //ereport(DEBUG1, errmsg("INSERT: %s", table));
+    ereport(DEBUG5, errmsg("INSERT: %s", table));
     if (snprintf (INSERT, insert_reqv_size + 1, "UPDATE %s SET h['%s']='%s';", table, key, value) != insert_reqv_size) {
         ereport (ERROR, errmsg ("sprintf err"));
         free(INSERT);
@@ -254,7 +254,7 @@ req_result del_value(char* table, char* key){
     char* DELETE = NULL;
     char* FIND = NULL;
     int n_rows;
-    //ereport(DEBUG1, errmsg("del_value: entered function"));
+    ereport(DEBUG5, errmsg("del_value: entered function"));
     if (!connected) {
         ereport(ERROR, errmsg("del_value: not connected with db"));
         return ERR_REQ;
@@ -277,7 +277,7 @@ req_result del_value(char* table, char* key){
         return finish_abnormally();
     }
 
-    //ereport(DEBUG1, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
+    ereport(DEBUG5, errmsg("Various info: table: %s, key: %s, request: SELECT exist(h, '%s') FROM %s", table, key, key, table));
     if (snprintf(FIND, size_find_reqv + 1, "SELECT exist(h, '%s') FROM %s;", key, table) != size_find_reqv) {
         ereport(ERROR, errmsg("snpritnf err FIND"));
         free(DELETE);
@@ -316,7 +316,7 @@ req_result del_value(char* table, char* key){
         free(FIND);
         return finish_abnormally();
     }
-    //ereport(DEBUG1, errmsg("Deletion finished"));
+    ereport(DEBUG5, errmsg("Deletion finished"));
     free(DELETE);
     free(FIND);
     return OK;
@@ -361,7 +361,7 @@ req_result create_table(char* new_table_name){
         return ERR_REQ;
     }
     // creating table
-    //ereport(DEBUG1 , errmsg( "non db %s - create", new_table_name));
+    ereport(DEBUG5 , errmsg( "non db %s - create", new_table_name));
     if (snprintf(CREATE_TABLE, create_t_size + 1, "CREATE TABLE %s (h hstore);", new_table_name) != create_t_size) {
         ereport(ERROR, errmsg( "sprintf err"));
         free(CREATE_TABLE);
@@ -403,6 +403,7 @@ void finish_work_with_db(void){
     PQfinish(conn);
 }
 
+// this function was created in order to make code a little bit shorter.
 inline req_result finish_abnormally() {
     ereport(ERROR, errmsg("Finished wirk with db abnormally"));
     // PQclear(NULL) is an OK operation, it does nothing and leaves.

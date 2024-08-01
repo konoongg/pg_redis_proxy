@@ -32,8 +32,6 @@
     PG_MODULE_MAGIC;
 #endif
 
-#define DEFAULT_PORT            (6379)
-#define DEFAULT_BACKLOG_SIZE    (512)
 
 
 PGDLLEXPORT void proxy_start_work(Datum main_arg);
@@ -57,13 +55,13 @@ static void on_write_cb(EV_P_ struct ev_io* io_handle, int revents){
     int byte_write;
     Tsocket_data* socket_data = (Tsocket_data*)io_handle->data;
     Tsocket_write_data* write_info = &(socket_data->write_data);
-    //ereport(LOG, errmsg("WRITE WORK %s %d", write_info->answer, write_info->size_answer));
+    ereport(INFO, errmsg("WRITE WORK %s %d", write_info->answer, write_info->size_answer));
     byte_write = write_data(io_handle->fd,write_info->answer, write_info->size_answer);
     if(byte_write == -1){
         return;
     }
     else if(byte_write == write_info->size_answer){
-        //ereport(LOG, errmsg("WRITER STOP"));
+        ereport(INFO, errmsg("WRITER STOP"));
         ev_io_stop(loop, io_handle);
         write_info->size_answer = 0;
     }
@@ -124,12 +122,12 @@ static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
             ereport(ERROR, errmsg("process redis to postgres"));
             return;
         }
-        //ereport(LOG, errmsg("START PR CONVERT pg_answer: %s", pg_answer));
+        ereport(INFO, errmsg("START PR CONVERT pg_answer: %s", pg_answer));
         if (define_type_req(pg_answer, &rd_answer, size_pg_answer, &size_rd_answer) == -1){
             ereport(ERROR, errmsg("can't translate pg_answer to rd_answer"));
             return;
         }
-        //ereport(LOG, errmsg("START WRITE"));
+        ereport(INFO, errmsg("START WRITE"));
         if(write_info->answer == NULL){
             write_info->answer = (char*)malloc(size_rd_answer * sizeof(char));
             write_info->size_answer = size_rd_answer;
@@ -145,9 +143,9 @@ static void on_read_cb(EV_P_ struct ev_io* io_handle, int revents){
             write_info->size_answer += size_rd_answer;
         }
     } while(read_info->cur_buffer_size != 0);
-    //ereport(LOG, errmsg("answer: %s answer_size: %d rd_answer: %s", write_info->answer, write_info->size_answer, rd_answer));
+    ereport(INFO, errmsg("answer: %s answer_size: %d rd_answer: %s", write_info->answer, write_info->size_answer, rd_answer));
     if(write_info->size_answer > 0){
-        //ereport(LOG, errmsg("EV_IO  wreti start"));
+        ereport(INFO, errmsg("EV_IO  write started"));
         ev_io_start(loop, write_io_handle);
     }
     free(pg_answer);
@@ -227,7 +225,7 @@ void proxy_start_work(Datum main_arg){
     struct ev_loop* loop;
 
     init_configuration();
-    //ereport(LOG, errmsg("START WORKER RF"));
+    ereport(INFO, errmsg("START WORKER RF"));
     if(init_hashes(config.db_count) == -1){
         ereport(ERROR, errmsg("can't init hashes"));
         return;
@@ -270,7 +268,7 @@ void proxy_start_work(Datum main_arg){
         return;
     }
     sockaddr.sin_family = AF_INET;
-    sockaddr.sin_port = htons(DEFAULT_PORT);
+    sockaddr.sin_port = htons(config.port);
     sockaddr.sin_addr.s_addr = INADDR_ANY;
     if (bind(listen_socket, (struct sockaddr *)&sockaddr, sizeof(sockaddr))) {
         char* err  =  strerror(errno);
@@ -279,7 +277,7 @@ void proxy_start_work(Datum main_arg){
         ev_loop_destroy(loop);
         return;
     }
-    if(listen(listen_socket, DEFAULT_BACKLOG_SIZE)) {
+    if(listen(listen_socket, config.backlog_size)) {
         char* err  =  strerror(errno);
         ereport(ERROR, errmsg("listen() error: %s", err));
         close(listen_socket);
@@ -300,7 +298,8 @@ void proxy_start_work(Datum main_arg){
     }
     ev_io_init(accept_io_handle, on_accept_cb, listen_socket, EV_READ);
     ev_io_start(loop, accept_io_handle);
-    //ereport(LOG, errmsg("EV_IO START"));
+    
+    ereport(INFO, errmsg("EV_IO START"));
     pqsignal(SIGTERM, die);
     pqsignal(SIGHUP, SignalHandlerForConfigReload);
     BackgroundWorkerUnblockSignals();

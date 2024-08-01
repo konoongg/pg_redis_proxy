@@ -21,8 +21,6 @@ int CreateSimplStr(char* reqv, char** answer, size_t size_reqv, int* size_answer
     }
     (*answer)[0] = '+';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
-    // (*answer)[(*size_answer) - 1] = '\n';
-    // (*answer)[(*size_answer) - 2] = '\r';
     memcpy(*answer + *size_answer - 2, "\r\n", 2);
     ereport(LOG, errmsg("RESULT CreateSimplStr : %s ", *answer));
     return 0;
@@ -64,8 +62,6 @@ int CreateStr(char* reqv, char** answer, size_t size_reqv, int* size_answer){
     (*answer)[1 + count_write_sym + 1] = '\n';
     if(size_reqv_data != 0){
         memcpy(*answer + 1 + count_write_sym + 2, reqv + 1,  size_reqv_data);
-        // (*answer)[(*size_answer)- 1] = '\n';
-        // (*answer)[(*size_answer) - 2] = '\r';
         memcpy(*answer + *size_answer - 2, "\r\n", 2);
     }
     ereport(LOG, errmsg("RESULT CreateStr: %s ", *answer));
@@ -86,8 +82,6 @@ int CreateInt (char* reqv, char** answer, size_t size_reqv, int* size_answer) {
     }
     (*answer)[0] = ':';
     memcpy(*answer + 1, reqv + 1, size_reqv_data);
-    // (*answer)[(*size_answer) - 1] = '\n';
-    // (*answer)[(*size_answer) - 2] = '\r';
     memcpy(*answer + *size_answer - 2, "\r\n", 2);
     ereport(LOG, errmsg("RESULT CreateInt : %s ", *answer));
     return 0;
