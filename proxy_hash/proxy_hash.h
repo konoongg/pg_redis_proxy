@@ -12,3 +12,4 @@ char* check_hash_table(int table_num, const char* key, bool* found);
 int set_hash_table(int table_num, char* key, char* value, char new_status);
 int init_hashes(int count_table);
 void free_hashes(void);
+
