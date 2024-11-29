@@ -5,9 +5,14 @@ MODULE_big = pg_redis_proxy
 OBJS = \
 	$(WIN32RES) \
 	redis_proxy.o \
+	config.o \
+	multiplexer.o \
+	socket_wrapper.o
 
 EXTENSION = pg_redis_proxy
 DATA = pg_redis_proxy--1.1.sql
+
+SHLIB_LINK += -lev
 
 ifdef USE_PGXS
 	PG_CONFIG = pg_config
