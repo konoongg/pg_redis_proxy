@@ -1,12 +1,18 @@
 #ifndef CONFIG_PARSER_H
 #define CONFIG_PARSER_H
 
-struct config_proxy {
-  int port;
-  int backlog_size;
-} typedef config_proxy;
+typedef struct init_worker_conf {
+    int backlog_size;
+    int buffer_size;
+    int count_worker;
+    int listen_port;
+} init_worker_conf;
 
-void init_config(config_proxy* config);
+struct config_redis {
+  init_worker_conf worker_conf;
+} typedef config_redis;
+
+void init_config(config_redis* config);
 
 #endif
 
