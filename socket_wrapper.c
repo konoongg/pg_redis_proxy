@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
@@ -13,8 +15,10 @@
 
 #include "socket_wrapper.h"
 
+int socket_set_nonblock(int socket_fd);
+
 // do socket non block or return err
-int socket_set_nonblock(int socket_fd){
+int socket_set_nonblock(int socket_fd) {
     int flags = fcntl(socket_fd, F_GETFL, 0);
     if (flags < 0) {
         return -1;
@@ -28,6 +32,7 @@ int socket_set_nonblock(int socket_fd){
 //create listen tcp socket and return err ro fd thos socket
 int init_listen_socket(int listen_port, int backlog_size) {
     int err;
+    const int val = 1;
     int listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     struct sockaddr_in sockaddr;
 
@@ -47,8 +52,7 @@ int init_listen_socket(int listen_port, int backlog_size) {
     sockaddr.sin_port = htons(listen_port);
     sockaddr.sin_addr.s_addr = INADDR_ANY;
 
-    const int val = 1;
-    int err = setsockopt(listen_socket, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val));
+    err = setsockopt(listen_socket, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val));
 	if (err == -1) {
         char* err_msg  =  strerror(errno);
         ereport(ERROR, errmsg("setsockopt: %s", err_msg));

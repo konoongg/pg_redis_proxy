@@ -4,10 +4,15 @@ MODULE_big = pg_redis_proxy
 
 OBJS = \
 	$(WIN32RES) \
-	redis_proxy.o \
+	command_processor.o \
 	config.o \
+	data_parser.o \
+	hash.o \
 	multiplexer.o \
-	socket_wrapper.o
+	redis_proxy.o \
+	socket_wrapper.o \
+	worker.o
+
 
 EXTENSION = pg_redis_proxy
 DATA = pg_redis_proxy--1.1.sql

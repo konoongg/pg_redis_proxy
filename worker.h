@@ -3,6 +3,6 @@
 
 
 
-int init_workers(int count_worker);
+int init_workers(init_worker_conf* conf);
 
 #endif

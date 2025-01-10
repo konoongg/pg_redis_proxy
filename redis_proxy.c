@@ -1,13 +1,15 @@
 #include <stdlib.h>
 
-#include "fmgr.h"
 #include "postgres.h"
+#include "fmgr.h"
 #include "postmaster/bgworker.h"
 #include "utils/elog.h"
 
 #include "config.h"
 #include "multiplexer.h"
 #include "socket_wrapper.h"
+#include "command_processor.h"
+#include "worker.h"
 
 PG_MODULE_MAGIC;
 
@@ -16,7 +18,7 @@ static void register_proxy(void);
 PGDLLEXPORT void proxy_start_work(Datum main_arg);
 void clean_up(void);
 
-config_proxy* config = NULL;
+config_redis* config = NULL;
 
 void _PG_init(void) {
     register_proxy();
@@ -35,12 +37,20 @@ static void register_proxy(void) {
 }
 
 void proxy_start_work(Datum main_arg) {
-    int err;
     ereport(INFO, errmsg("start bg worker pg_redis_proxy"));
     config = (config_redis*) malloc(sizeof(config_redis));
     if (config == NULL) {
-        ereport(ERROR, errmsg("can't alloc memory"));
+        char* err_msg = strerror(errno);
+        ereport(ERROR, errmsg("proxy_start_work: malloc error - %s", err_msg));
         abort();
     }
     init_config(config);
+    if (init_commands() != 0) {
+        ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));
+        abort();
+    }
+    if (init_workers(&config->worker_conf) != 0) {
+        ereport(ERROR, errmsg("proxy_start_work: can't init_workers"));
+        abort();
+    }
 }

@@ -1,5 +1,6 @@
 #include "config.h"
 
+void defalt_setting_init(config_redis* config);
 
 void defalt_setting_init(config_redis* config) {
     config->worker_conf.listen_port = 6379;

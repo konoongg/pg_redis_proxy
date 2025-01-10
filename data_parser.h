@@ -1,8 +1,8 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "multiplexer.h"
+#include "connection.h"
 
-Eexit_status pars_data(socket_read_data* read_data);
+Eexit_status pars_data(socket_read_data* data) ;
 
 #endif
