@@ -41,11 +41,6 @@ struct socket_parsing {
     read_status next_read_status;
 };
 
-// struct with ev_io WRITE
-struct socket_write_data {
-    char* answer;
-    int size_answer;
-};
 
 typedef struct client_req {
     char** argv;
@@ -68,8 +63,15 @@ struct socket_read_data {
     socket_parsing parsing;
 };
 
+// struct with ev_io WRITE
+struct socket_write_data {
+    char* answer;
+    int size_answer;
+};
+
 // struct with connect
 struct socket_data {
+    //clinet* cli;
     socket_write_data* write_data;
     socket_read_data* read_data;
     struct ev_io* write_io_handle;

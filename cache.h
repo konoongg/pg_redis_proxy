@@ -12,9 +12,9 @@ typedef struct cache_data cache_data;
 typedef struct kv_db kv_db;
 typedef struct kv_storage kv_storage;
 
-int get(int cur_db, char* key, void** value);
+int get_cache(int cur_db, char* key, void** value);
 int init_cache(cache_conf* conf);
-int set(int cur_db, char* key, void* value, data_type d_type);
+int set_cache(int cur_db, char* key, void* value, data_type d_type);
 void free_cache(void);
 
 enum data_type {

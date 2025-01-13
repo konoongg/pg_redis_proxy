@@ -65,7 +65,7 @@ int init_cache(cache_conf* conf) {
     return 0;
 }
 
-int get(int cur_db, char* key, void** value) {
+int get_cache(int cur_db, char* key, void** value) {
     u_int64_t hash = db.hash_func(key);
     kv_storage storage = db.storages[cur_db];
     cache_basket* basket = &(storage.kv[hash]);
@@ -103,7 +103,7 @@ int get(int cur_db, char* key, void** value) {
     return 0;
 }
 
-int set(int cur_db, char* key, void* value, data_type d_type) {
+int set_cache(int cur_db, char* key, void* value, data_type d_type) {
     u_int64_t hash = db.hash_func(key);
     kv_storage storage = db.storages[cur_db];
     cache_basket* basket = &(storage.kv[hash]);

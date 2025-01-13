@@ -5,10 +5,11 @@
 #include "postmaster/bgworker.h"
 #include "utils/elog.h"
 
+#include "cache.h"
+#include "command_processor.h"
 #include "config.h"
 #include "multiplexer.h"
 #include "socket_wrapper.h"
-#include "command_processor.h"
 #include "worker.h"
 
 PG_MODULE_MAGIC;
@@ -47,6 +48,10 @@ void proxy_start_work(Datum main_arg) {
     init_config(config);
     if (init_commands() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));
+        abort();
+    }
+    if (init_cache(&config->c_conf) != 0) {
+        ereport(ERROR, errmsg("proxy_start_work: can't init_cache"));
         abort();
     }
     if (init_workers(&config->worker_conf) != 0) {

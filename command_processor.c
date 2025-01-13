@@ -5,9 +5,11 @@
 #include "postgres.h"
 #include "utils/elog.h"
 
+#include "cache.h"
 #include "command_processor.h"
 #include "connection.h"
 #include "hash.h"
+#include "resp_creater.h"
 
 command_dict* com_dict;
 
@@ -107,31 +109,36 @@ int init_commands(void) {
     return 0;
 }
 
-void create_err(char* answer, char* err) {
 
-}
-
-int do_del (char** argv, int argc) {
-    if (argc != 2) {
-
+int do_del (client_req* req, char** answer) {
+    if (req->argc != 2) {
+        create_err(answer, "ERR syntax error");
     }
     ereport(INFO, errmsg("do_del"));
     return 0;
 }
 
-int do_set (char** argv, int argc) {
-    if (argc != 3) {
-
+int do_set (client_req* req, char** answer) {
+    if (req->argc != 3) {
+        create_err(answer, "ERR syntax error");
     }
+    char* cache_data = NULL;
+    if (set_cache(0, req->argv[1],  req->argv[2], STRING) == 0) {
+        create_simple_string(cache_data, answer);
+    } else {
+        create_err(answer, "ERR syntax error");
+    }
+
     ereport(INFO, errmsg("do_set"));
     return 0;
 }
 
 
-int do_get (char** argv, int argc) {
-    if (argc != 2) {
-
+int do_get (client_req* req, char** answer) {
+    if (req->argc != 2) {
+        create_err(answer, "ERR syntax error");
     }
+
     ereport(INFO, errmsg("do_get"));
     return 0;
 }
@@ -140,7 +147,7 @@ int do_get (char** argv, int argc) {
 // finds the corresponding function in the dictionary by the command name, and calls it.
 // This implementation allows for quickly
 // finding the function associated with a command in a short amount of time.
-void process_command(client_req* req) {
+void process_command(client_req* req, char** answer) {
     int hash = com_dict->hash_func(req->argv[0]);
     int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;
@@ -148,7 +155,7 @@ void process_command(client_req* req) {
 
         ereport(INFO, errmsg("t0 %s %s %d", cur_command->command->name, req->argv[0], size_command_name));
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
-            int err = cur_command->command->func(req->argv);
+            int err = cur_command->command->func(req, answer);
             if (err != 0) {
                 ereport(INFO, errmsg("process_command: func err"));
             }
