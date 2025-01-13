@@ -3,10 +3,13 @@
 void defalt_setting_init(config_redis* config);
 
 void defalt_setting_init(config_redis* config) {
-    config->worker_conf.listen_port = 6379;
+    config->c_conf.count_basket = 100000;
+    config->c_conf.databases = 16;
+    config->c_conf.mm_policy = noeviction;
     config->worker_conf.backlog_size = 512;
     config->worker_conf.buffer_size = 512;
     config->worker_conf.count_worker = 4;
+    config->worker_conf.listen_port = 6379;
 }
 
 // Initialize the config value from the corresponding file.

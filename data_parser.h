@@ -3,6 +3,6 @@
 
 #include "connection.h"
 
-Eexit_status pars_data(socket_read_data* data) ;
+exit_status pars_data(socket_read_data* data) ;
 
 #endif

@@ -3,11 +3,13 @@
 
 #include <stdint.h>
 
+#include "connection.h"
+
 #define COMMAND_DICT_SIZE 3
 
-int do_get(char** argv);
-int do_set(char** argv);
-int do_del(char** argv);
+int do_get(char** argv, int argc);
+int do_set(char** argv, int argc);
+int do_del(char** argv, int argc);
 
 typedef struct command_dict  command_dict;
 typedef struct redis_command  redis_command;
@@ -16,7 +18,7 @@ typedef struct entris entris;
 
 struct redis_command {
     char* name;
-    int (*func)(char** argv);
+    int (*func)(char** argv, int argc);
 };
 
 
@@ -37,7 +39,7 @@ struct entris {
 };
 
 int init_commands(void);
-int process_command(char** argv, int argc);
+void process_command(client_req* req);
 redis_command get_command();
 
 #endif

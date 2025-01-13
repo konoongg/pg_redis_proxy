@@ -1,39 +1,51 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
 
+typedef struct clinet clinet;
+typedef struct socket_parsing socket_parsing;
+typedef struct socket_write_data socket_write_data;
+typedef enum read_status read_status;
+typedef enum exit_status exit_status;
+typedef struct client_req client_req;
+typedef struct socket_read_data socket_read_data;
+typedef struct socket_data socket_data;
+
 // parsers status
-typedef enum Eread_status {
+enum read_status {
     ARRAY_WAIT,
     ARGC_WAIT, // count argc
     NUM_WAIT,
     STRING_WAIT, // wait sym of string
     START_STRING_WAIT, //wait $
+    CR, // skip \r
+    LF, // WAIT \n after \r
     END // skip last \n\r
-} Eread_status;
+};
 
 /* status finish parsing
  * NOT_ALL - Need more data, wait data and reading
  * */
-typedef enum Eexit_status {
+enum exit_status {
     ERR = -1,
     NOT_ALL,
     ALL
-} Eexit_status;
+};
 
-typedef struct socket_parsing{
+struct socket_parsing {
     char* parsing_str;
     int cur_size_str;
     int parsing_num;
     int size_str;
     int cur_count_argv;
-    Eread_status read_status;
-} socket_parsing;
+    read_status cur_read_status;
+    read_status next_read_status;
+};
 
 // struct with ev_io WRITE
-typedef struct socket_write_data{
+struct socket_write_data {
     char* answer;
     int size_answer;
-} socket_write_data;
+};
 
 typedef struct client_req {
     char** argv;
@@ -48,21 +60,24 @@ typedef struct requests {
 } requests;
 
 // struct with ev_io read
-struct socket_read_data{
+struct socket_read_data {
     char* read_buffer;
     int buffer_size;
     int cur_buffer_size;
     requests* reqs;
     socket_parsing parsing;
-} typedef socket_read_data;
+};
 
 // struct with connect
-struct socket_data{
+struct socket_data {
     socket_write_data* write_data;
     socket_read_data* read_data;
     struct ev_io* write_io_handle;
     struct ev_io* read_io_handle;
-} typedef socket_data;
+};
 
+struct clinet {
+    int cur_db;
+};
 
 #endif

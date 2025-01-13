@@ -6,18 +6,24 @@
 #include "utils/elog.h"
 
 #include "command_processor.h"
+#include "connection.h"
 #include "hash.h"
 
 command_dict* com_dict;
 
+
+// This is a dictionary that establishes a correspondence between a command name
+// and the function that should be called as a callback when that command is received.
 redis_command commands[] = {
     {"get", do_get},
     {"set", do_set},
     {"del", do_del}
 };
 
-void free_command(int hash) ;
+void free_command(int hash);
+void create_err(char* answer, char* err);
 
+// It releases all resources associated with the structure describing the command
 void free_command(int hash) {
     command_entry* cur_entry = com_dict->commands[hash]->first;
 
@@ -30,6 +36,10 @@ void free_command(int hash) {
     free(com_dict->commands[hash]);
 }
 
+// It initializes the command structures;
+// a hash is calculated for each command name,
+// and a hash map is created. This hash map stores,
+// by hash, a structure containing the command name and the callback function.
 int init_commands(void) {
     com_dict = (command_dict*)malloc(sizeof(command_dict));
     if (com_dict == NULL) {
@@ -97,33 +107,53 @@ int init_commands(void) {
     return 0;
 }
 
-int do_del (char** argv) {
+void create_err(char* answer, char* err) {
+
+}
+
+int do_del (char** argv, int argc) {
+    if (argc != 2) {
+
+    }
     ereport(INFO, errmsg("do_del"));
     return 0;
 }
 
-int do_set (char** argv) {
+int do_set (char** argv, int argc) {
+    if (argc != 3) {
+
+    }
     ereport(INFO, errmsg("do_set"));
     return 0;
 }
 
 
-int do_get (char** argv) {
+int do_get (char** argv, int argc) {
+    if (argc != 2) {
+
+    }
     ereport(INFO, errmsg("do_get"));
     return 0;
 }
 
-
-int process_command(char** argv, int argc) {
-    int hash = com_dict->hash_func(argv[0]);
-    int size_command_name = strlen(argv[0]) + 1;
+// It receives a command with arguments,
+// finds the corresponding function in the dictionary by the command name, and calls it.
+// This implementation allows for quickly
+// finding the function associated with a command in a short amount of time.
+void process_command(client_req* req) {
+    int hash = com_dict->hash_func(req->argv[0]);
+    int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;
     while (cur_command != NULL) {
-        cur_command = cur_command->next;
-        if (strncpy(cur_command->command->name, argv[0], size_command_name)) {
-            int err = cur_command->command->func(argv);
-            return err;
+
+        ereport(INFO, errmsg("t0 %s %s %d", cur_command->command->name, req->argv[0], size_command_name));
+        if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
+            int err = cur_command->command->func(req->argv);
+            if (err != 0) {
+                ereport(INFO, errmsg("process_command: func err"));
+            }
         }
+        ereport(INFO, errmsg("t3"));
+        cur_command = cur_command->next;
     }
-    return -1;
 }

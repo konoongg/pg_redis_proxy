@@ -7,8 +7,9 @@
 #include "utils/elog.h"
 #include "miscadmin.h"
 
-#include "connection.h"
+#include "command_processor.h"
 #include "config.h"
+#include "connection.h"
 #include "data_parser.h"
 #include "multiplexer.h"
 #include "socket_wrapper.h"
@@ -56,7 +57,7 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {}
  */
 void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
     client_req* cur_req;
-    Eexit_status status;
+    exit_status status;
     int free_buffer_size;
     int res;
     socket_data* data = (socket_data*)io_handle->data;
@@ -85,8 +86,10 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
 
             cur_req = r_data->reqs->first;
             while (cur_req != NULL) {
+                process_command(cur_req);
                 cur_req = cur_req->next;
             }
+
         } else if (status == NOT_ALL) {
             return;
         }
@@ -213,7 +216,7 @@ void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     data->read_data->parsing.parsing_str = NULL;
     data->read_data->parsing.size_str = 0;
     data->read_data->read_buffer = read_buffer;
-    data->read_data->parsing.read_status = ARRAY_WAIT;
+    data->read_data->parsing.cur_read_status = ARRAY_WAIT;
     data->read_data->reqs = reqs;
     data->read_io_handle = read_io_handle;
 
