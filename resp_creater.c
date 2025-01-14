@@ -10,7 +10,7 @@
 const char crlf[] = "\r\n";
 
 
-int create_simple_string(char** result, char* src) {
+int create_simple_string_resp(char** result, char* src) {
     int result_size = 1 + strlen(src) + 2;  // +<src>\n\r
     int index = 0;
 
@@ -29,7 +29,7 @@ int create_simple_string(char** result, char* src) {
     return result_size;
 }
 
-int create_bulk_string(char** result, char* src, int size) {
+int create_bulk_string_resp(char** result, char* src, int size) {
     int index = 0;
 
     char str_size[20];
@@ -58,7 +58,7 @@ int create_bulk_string(char** result, char* src, int size) {
     return result_size;
 }
 
-int create_err(char** result, char* src) {
+int create_err_resp(char** result, char* src) {
     int result_size = 1 + strlen(src) + 2;  // -<error message>\r\n - Error
     int index = 0;
 

@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <pthread.h>
 
@@ -7,22 +9,9 @@
 
 #include "cache.h"
 #include "config.h"
+#include "strings.h"
 
 kv_db db ;
-
-int copy_data(void* src, void** dst, data_type d_type) {
-    if (d_type == STRING) {
-        int data_size = strlen(src) + 1;
-        *dst = malloc(data_size * sizeof(char));
-        if (*dst == NULL) {
-            char* err_msg = strerror(errno);
-            ereport(ERROR, errmsg("copy_data: malloc error - %s", err_msg));
-            return -1;
-        }
-        memcpy(*dst, src, data_size);
-    }
-    return 0;
-}
 
 int init_cache(cache_conf* conf) {
     db.count_db = conf->databases;
@@ -65,112 +54,85 @@ int init_cache(cache_conf* conf) {
     return 0;
 }
 
-int get_cache(int cur_db, char* key, void** value) {
-    u_int64_t hash = db.hash_func(key);
+cache_get_result get_cache(int cur_db, cache_data new_data){
+    u_int64_t hash = db.hash_func(new_data.key);
     kv_storage storage = db.storages[cur_db];
     cache_basket* basket = &(storage.kv[hash]);
-    int key_size = strlen(key) + 1;
-
-    int err = pthread_spin_lock(basket->lock);
-    if (err != 0) {
-        ereport(ERROR, errmsg("init_cache: pthread_spin_lock() failed - %s", strerror(err)));
-        return -1;
-    }
+    cache_get_result get_result;
 
     cache_data* data = basket->first;
 
     while (data != NULL) {
-        if (strncmp(data->key, key, key_size) == 0) {
-            copy_data(data->d_type, value, data->d_type);
-
-            err = pthread_spin_unlock(basket->lock);
-            if (err != 0) {
-                ereport(ERROR, errmsg("init_cache: pthread_spin_lock() failed - %s", strerror(err)));
-                return -1;
+        if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
+            if (data->d_type != new_data.d_type) {
+                get_result.err = true;
+                get_result = 
             }
-            return 0;
+            get_result.result = data->data;
+            get_result.err = false;
+            return get_result;
         }
         data = data->next;
     }
 
-    err = pthread_spin_unlock(basket->lock);
-    if (err != 0) {
-        ereport(ERROR, errmsg("init_cache: pthread_spin_lock() failed - %s", strerror(err)));
-        return -1;
-    }
-
-    *value = NULL;
-    return 0;
+    get_result.result = NULL;
+    get_result.err = false;
+    return get_result;
 }
 
-int set_cache(int cur_db, char* key, void* value, data_type d_type) {
-    u_int64_t hash = db.hash_func(key);
+int set_cache(int cur_db, cache_data new_data) {
+    u_int64_t hash = db.hash_func(new_data.key);
     kv_storage storage = db.storages[cur_db];
     cache_basket* basket = &(storage.kv[hash]);
-    int key_size = strlen(key) + 1;
 
+    cache_data* data = basket->first;
 
-    int err = pthread_spin_lock(basket->lock);
-    if (err != 0) {
-        ereport(ERROR, errmsg("init_cache: pthread_spin_lock() failed - %s", strerror(err)));
-        return -1;
+    while (data != NULL) {
+        if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
+            if (data->d_type != new_data.d_type) {
+                return -1;
+            }
+            break;
+        }
     }
-
-    cache_data* data = basket->last;
 
     if (data == NULL) {
         data = malloc(sizeof(cache_data));
         if (data == NULL) {
             char* err_msg = strerror(errno);
             ereport(ERROR, errmsg("set: malloc error - %s", err_msg));
-
-            int err = pthread_spin_unlock(basket->lock);
-            if (err != 0) {
-                ereport(ERROR, errmsg("set: pthread_spin_lock() failed - %s", strerror(err)));
-            }
-
-            return -1;
         }
-        basket->last = basket->first = data;
-    } else {
-        data->next = malloc(sizeof(cache_data));
-        if (data->next  == NULL) {
-            char* err_msg = strerror(errno);
-            ereport(ERROR, errmsg("set: malloc error - %s", err_msg));
+        memset(data, 0, sizeof(cache_data));
 
-            int err = pthread_spin_unlock(basket->lock);
-            if (err != 0) {
-                ereport(ERROR, errmsg("set: pthread_spin_lock() failed - %s", strerror(err)));
-            }
-
-            return -1;
+        if (basket->first == NULL) {
+            basket->first = basket->last = data;
+        } else {
+            basket->last->next = data;
+            basket->last = basket->last->next;
         }
-        basket->last = data = data->next;
+        data->next = NULL;
+        memcpy(data->key, new_data.key, new_data.key_size);
+        data->key_size = new_data.key_size;
     }
-    data->d_type = d_type;
-    strncpy(key, data->key, key_size);
-    cope_data(value, &data->data, d_type);
-    data->next = NULL;
 
     data->last_time = time(NULL);
     if (data->last_time == -1) {
-
         char* err_msg = strerror(errno);
         ereport(ERROR, errmsg("set: time error - %s", err_msg));
-
-        int err = pthread_spin_unlock(basket->lock);
-        if (err != 0) {
-            ereport(ERROR, errmsg("set: pthread_spin_lock() failed - %s", strerror(err)));
-        }
         return -1;
     }
 
-    int err = pthread_spin_unlock(basket->lock);
-    if (err != 0) {
-        ereport(ERROR, errmsg("set: pthread_spin_lock() failed - %s", strerror(err)));
-        return -1;
+    if (data->data != NULL) {
+        data->free_data(data->data);
     }
+    data->data = new_data.data;
+
     return 0;
+}
+
+
+void free_cache_key(char* key) {
+
 }
 
 void free_storage(kv_storage storage) {
@@ -192,15 +154,46 @@ void free_storage(kv_storage storage) {
     free(storage.kv);
 }
 
-void free_data(void* data, data_type d_type) {
-    if (d_type == STRING) {
-        free(data);
-    }
-}
-
 void free_cache(void) {
     for (int i = 0; i < db.count_db; ++i) {
         free_storage(db.storages[i]);
     }
     free(db.storages);
+}
+
+int lock_cache_basket(int cur_db, char* key) {
+    u_int64_t hash = db.hash_func(key);
+    kv_storage storage = db.storages[cur_db];
+    cache_basket* basket = &(storage.kv[hash]);
+
+    int err = pthread_spin_lock(basket->lock);
+    if (err != 0) {
+        ereport(ERROR, errmsg("set: pthread_spin_lock() failed - %s", strerror(err)));
+        return -1;
+    }
+    return 0;
+}
+
+int unlock_cache_basket(int cur_db, char* key) {
+    u_int64_t hash = db.hash_func(key);
+    kv_storage storage = db.storages[cur_db];
+    cache_basket* basket = &(storage.kv[hash]);
+
+    int err = pthread_spin_unlock(basket->lock);
+    if (err != 0) {
+        ereport(ERROR, errmsg("set: pthread_spin_lock() failed - %s", strerror(err)));
+        return -1;
+    }
+    return 0;
+}
+
+cache_data create_data(char* key, int key_size, void* data, data_type d_type,  void (*free_data)(void* data)) {
+    cache_data new_data;
+    memset(&new_data, 0, sizeof(new_data));
+
+    new_data.key_size = key_size;
+    new_data.key = key;
+    new_data.d_type = d_type;
+    new_data.free_data = free_data;
+    return new_data;
 }

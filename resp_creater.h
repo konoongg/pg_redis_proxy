@@ -10,9 +10,9 @@
 */
 
 
-int create_bulk_string(char** result, char* src, int size);
-int create_err(char** result, char* src);
-int create_num(char** result, int num);
-int create_simple_string(char** result, char* src);
+int create_bulk_string_resp(char** result, char* src, int size);
+int create_err_resp(char** result, char* src);
+int create_num_resp(char** result, int num);
+int create_simple_string_resp(char** result, char* src);
 
 #endif

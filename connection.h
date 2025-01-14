@@ -44,6 +44,7 @@ struct socket_parsing {
 
 typedef struct client_req {
     char** argv;
+    int* argv_size;
     int argc;
     struct client_req* next;
 } client_req;

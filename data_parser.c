@@ -61,9 +61,17 @@ exit_status pars_data(socket_read_data* data) {
             data->reqs->last->argv = malloc(data->reqs->last->argc * sizeof(char*));
             if (data->reqs->last->argv == NULL) {
                 char* err_msg = strerror(errno);
-                ereport(ERROR, errmsg("pars_data: read error - %s", err_msg));
+                ereport(ERROR, errmsg("pars_data: malloc error - %s", err_msg));
                 return ERR;
             }
+
+            data->reqs->last->argv_size = malloc(data->reqs->last->argc * sizeof(int));
+            if (data->reqs->last->argv_size == NULL) {
+                char* err_msg = strerror(errno);
+                ereport(ERROR, errmsg("pars_data: malloc error - %s", err_msg));
+                return ERR;
+            }
+
             data->parsing.parsing_num = 0;
             data->parsing.next_read_status = START_STRING_WAIT;
             data->parsing.cur_read_status = LF;
@@ -102,6 +110,7 @@ exit_status pars_data(socket_read_data* data) {
 
                 memcpy(new_str, data->parsing.parsing_str, data->parsing.size_str + 1);
                 data->reqs->last->argv[data->parsing.cur_count_argv] = new_str;
+                data->reqs->last->argv_size[data->parsing.cur_count_argv] = data->parsing.cur_size_str;
                 free(data->parsing.parsing_str);
                 data->parsing.cur_count_argv++;
                 data->parsing.size_str = data->parsing.cur_size_str = 0;

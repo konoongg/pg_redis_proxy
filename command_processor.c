@@ -109,40 +109,6 @@ int init_commands(void) {
     return 0;
 }
 
-
-int do_del (client_req* req, char** answer) {
-    if (req->argc != 2) {
-        create_err(answer, "ERR syntax error");
-    }
-    ereport(INFO, errmsg("do_del"));
-    return 0;
-}
-
-int do_set (client_req* req, char** answer) {
-    if (req->argc != 3) {
-        create_err(answer, "ERR syntax error");
-    }
-    char* cache_data = NULL;
-    if (set_cache(0, req->argv[1],  req->argv[2], STRING) == 0) {
-        create_simple_string(cache_data, answer);
-    } else {
-        create_err(answer, "ERR syntax error");
-    }
-
-    ereport(INFO, errmsg("do_set"));
-    return 0;
-}
-
-
-int do_get (client_req* req, char** answer) {
-    if (req->argc != 2) {
-        create_err(answer, "ERR syntax error");
-    }
-
-    ereport(INFO, errmsg("do_get"));
-    return 0;
-}
-
 // It receives a command with arguments,
 // finds the corresponding function in the dictionary by the command name, and calls it.
 // This implementation allows for quickly
@@ -152,15 +118,12 @@ void process_command(client_req* req, char** answer) {
     int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;
     while (cur_command != NULL) {
-
-        ereport(INFO, errmsg("t0 %s %s %d", cur_command->command->name, req->argv[0], size_command_name));
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
             int err = cur_command->command->func(req, answer);
             if (err != 0) {
                 ereport(INFO, errmsg("process_command: func err"));
             }
         }
-        ereport(INFO, errmsg("t3"));
         cur_command = cur_command->next;
     }
 }
