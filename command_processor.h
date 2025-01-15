@@ -7,23 +7,23 @@
 
 #define COMMAND_DICT_SIZE 3
 
-int do_get(client_req* req, char** answer);
-int do_set(client_req* req, char** answer);
-int do_del(client_req* req, char** answer);
-
-typedef struct command_dict  command_dict;
-typedef struct redis_command  redis_command;
+typedef struct command_dict command_dict;
 typedef struct command_entry command_entry;
 typedef struct entris entris;
+typedef struct redis_command redis_command;
+
+int init_commands(void);
+redis_command get_command();
+void process_command(client_req* req, answer* answ);
 
 struct redis_command {
     char* name;
-    int (*func)(client_req* req, char** answer);
+    int (*func)(client_req* req, answer* answ);
 };
 
 struct command_dict {
-    int (*hash_func)(char* key);
     entris** commands;
+    int (*hash_func)(char* key);
 };
 
 struct command_entry {
@@ -35,9 +35,5 @@ struct entris {
     command_entry* first;
     command_entry* last;
 };
-
-int init_commands(void);
-void process_command(client_req* req, char** answer);
-redis_command get_command();
 
 #endif

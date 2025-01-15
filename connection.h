@@ -1,14 +1,15 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
 
-typedef struct clinet clinet;
-typedef struct socket_parsing socket_parsing;
-typedef struct socket_write_data socket_write_data;
-typedef enum read_status read_status;
 typedef enum exit_status exit_status;
+typedef enum read_status read_status;
+typedef struct answer answer;
 typedef struct client_req client_req;
-typedef struct socket_read_data socket_read_data;
+typedef struct clinet clinet;
 typedef struct socket_data socket_data;
+typedef struct socket_parsing socket_parsing;
+typedef struct socket_read_data socket_read_data;
+typedef struct socket_write_data socket_write_data;
 
 // parsers status
 enum read_status {
@@ -41,7 +42,6 @@ struct socket_parsing {
     read_status next_read_status;
 };
 
-
 typedef struct client_req {
     char** argv;
     int* argv_size;
@@ -64,10 +64,15 @@ struct socket_read_data {
     socket_parsing parsing;
 };
 
+struct answer {
+    char* answer;
+    int answer_size;
+    answer* next;
+};
+
 // struct with ev_io WRITE
 struct socket_write_data {
-    char* answer;
-    int size_answer;
+    answer* answers;
 };
 
 // struct with connect

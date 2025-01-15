@@ -9,11 +9,11 @@
 
 #include "miscadmin.h"
 
+#include "alloc.h"
 #include "config.h"
 #include "multiplexer.h"
 #include "socket_wrapper.h"
 #include "worker.h"
-
 
 void* start_worker(void* argv);
 
@@ -25,6 +25,8 @@ void* start_worker(void* argv) {
     struct ev_loop* loop;
     int listen_socket = init_listen_socket(conf->listen_port, conf->backlog_size);
 
+    ereport(INFO, errmsg("start worker"));
+
     if (listen_socket == -1) {
         return NULL;
     }
@@ -35,12 +37,8 @@ void* start_worker(void* argv) {
         return NULL;
     }
 
-    accept_io_handle = (struct ev_io*) malloc(sizeof(struct ev_io));
-    if (accept_io_handle == NULL) {
-        ereport(ERROR, errmsg("cannot create io handle for listen socket"));
-        ev_loop_destroy(loop);
-        return NULL;
-    }
+    accept_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
+
 
     a_conf.buffer_size = conf->buffer_size;
     a_conf.listen_socket = listen_socket;
@@ -65,26 +63,26 @@ void* start_worker(void* argv) {
 }
 
 int init_workers(init_worker_conf* conf) {
-    pthread_t* tids = (pthread_t*)malloc(conf->count_worker * sizeof(pthread_t));
-    if (tids == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("init_worker: malloc error %s  - ", err_msg));
-        return -1;
-    }
+    pthread_t* tids =
+        (pthread_t*)wcalloc(conf->count_worker * sizeof(pthread_t));
 
     for (int i = 0; i < conf->count_worker; ++i) {
         int err = pthread_create(&(tids[i]), NULL, start_worker, conf);
         if (err) {
-            ereport(ERROR, errmsg("init_worker: pthread_create error %s", strerror(err)));
+            ereport(ERROR, errmsg("init_worker: pthread_create error %s",
+                                  strerror(err)));
             free(tids);
             return -1;
         }
     }
 
+    ereport(INFO, errmsg("start all workers"));
+
     for (int i = 0; i < conf->count_worker; ++i) {
         int err = pthread_join(tids[i], NULL);
         if (err) {
-            ereport(ERROR, errmsg("init_worker: pthread_join error %s", strerror(err)));
+            ereport(ERROR, errmsg("init_worker: pthread_join error %s",
+                                  strerror(err)));
             free(tids);
             return -1;
         }

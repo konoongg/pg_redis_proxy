@@ -1,8 +1,8 @@
 #ifndef CACHE_H
 #define CACHE_H
 
-
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -15,20 +15,19 @@ typedef struct kv_db kv_db;
 typedef struct kv_storage kv_storage;
 typedef struct cache_get_result cache_get_result;
 
-
-cache_data create_data(char* key, int key_size, void* data, data_type d_type,  void (*free_data)(void* data));
+cache_data create_data(char* key, int key_size, void* data, data_type d_type,
+                       void (*free_data)(void* data));
 cache_get_result get_cache(int cur_db, cache_data new_data);
 int init_cache(cache_conf* conf);
-int lock_cache_basket(int cur_db, char* key);
+int lock_cache_basket(int cur_db, char* key, int key_size);
 int set_cache(int cur_db, cache_data new_data);
-int unlock_cache_basket(int cur_db, char* key);
-void cache_free_key(char* key);
+int unlock_cache_basket(int cur_db, char* key, int key_size);
+void free_cache_key(int cur_db, char* key, int key_size);
 void free_cache(void);
+
 enum data_type {
     STRING,
 };
-
-
 
 struct cache_data {
     cache_data* next;
@@ -49,7 +48,7 @@ struct cache_get_result {
 struct cache_basket {
     cache_data* first;
     cache_data* last;
-    pthread_spinlock_t lock;
+    pthread_spinlock_t* lock;
 };
 
 struct kv_storage {
@@ -60,8 +59,7 @@ struct kv_storage {
 struct kv_db {
     int count_db;
     kv_storage* storages;
-    uint64_t (*hash_func)(char* key);
+    uint64_t (*hash_func)(char* key, int key_size, int count_basket, void* argv);
 };
 
 #endif
-

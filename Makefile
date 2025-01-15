@@ -4,13 +4,17 @@ MODULE_big = pg_redis_proxy
 
 OBJS = \
 	$(WIN32RES) \
+	alloc.o \
+	cache.o \
 	command_processor.o \
 	config.o \
 	data_parser.o \
 	hash.o \
 	multiplexer.o \
 	redis_proxy.o \
+	resp_creater.o \
 	socket_wrapper.o \
+	strings.o \
 	worker.o
 
 

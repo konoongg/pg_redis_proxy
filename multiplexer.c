@@ -7,6 +7,7 @@
 #include "utils/elog.h"
 #include "miscadmin.h"
 
+#include "alloc.h"
 #include "command_processor.h"
 #include "config.h"
 #include "connection.h"
@@ -28,6 +29,7 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 void close_connection(EV_P_ struct ev_io* io_handle) {
     socket_data* data = io_handle->data;
     client_req* cur_req;
+    answer* cur_answer;
 
     close_with_check(io_handle->fd);
 
@@ -38,8 +40,15 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
         cur_req = req;
     }
 
+    cur_answer = data->write_data->answers;
+    while(cur_answer != NULL) {
+        answer* next_answer = cur_answer->next;
+        free(cur_answer->answer);
+        free(cur_answer);
+        cur_answer = next_answer;
+    }
+
     free(data->read_data->reqs);
-    free(data->write_data->answer);
     free(data->read_data->parsing.parsing_str);
     free(data->read_data->read_buffer);
     free(data->read_data);
@@ -49,7 +58,35 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
     free(data);
 }
 
-void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {}
+void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
+    socket_data* data = (socket_data*)io_handle->data;
+    socket_write_data* w_data = data->write_data;
+    answer* cur_answer = w_data->answers;
+    while (cur_answer != NULL) {
+        int res =  write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
+        if (res == cur_answer->answer_size) {
+            answer* next_answer = cur_answer->next;
+            free(cur_answer->answer);
+            free(cur_answer);
+            cur_answer = next_answer;
+            w_data->answers = cur_answer;
+        } else if (res == -1) {
+            char* err_msg = strerror(errno);
+            ereport(ERROR, errmsg("on_write_cb: write error %s  - ", err_msg));
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return;
+            }
+            close_connection(loop, io_handle);
+            return;
+        } else {
+            cur_answer->answer_size -=  res;
+            memmove(cur_answer->answer, cur_answer + res, cur_answer->answer_size);
+            return;
+        }
+    }
+    w_data->answers = NULL;
+    ev_io_stop(loop, data->write_io_handle);
+}
 
 /*
  * This function is called when data arrives for reading in the corresponding socket.
@@ -57,11 +94,14 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {}
  */
 void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
     client_req* cur_req;
+    answer* cur_answer;
+    answer* prev_answer;
     exit_status status;
     int free_buffer_size;
     int res;
     socket_data* data = (socket_data*)io_handle->data;
     socket_read_data* r_data = data->read_data;
+    socket_write_data* w_data = data->write_data;
 
     if (revents & EV_ERROR) {
         ereport(ERROR, errmsg("on_read_cb: EV_ERROR, close connection "));
@@ -85,10 +125,24 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
             }
 
             cur_req = r_data->reqs->first;
+
+            w_data->answers = wcalloc(sizeof(answer));
+            w_data->answers->next = NULL;
+            cur_answer = w_data->answers;
+            prev_answer = NULL;
             while (cur_req != NULL) {
-                process_command(cur_req);
+                if (cur_answer == NULL) {
+                    cur_answer = wcalloc(sizeof(answer));
+                    w_data->answers->next = NULL;
+                    prev_answer->next = cur_answer;
+                }
+                process_command(cur_req, cur_answer);
                 cur_req = cur_req->next;
+                prev_answer = cur_answer;
+                cur_answer = cur_answer->next;
             }
+
+            ev_io_start(loop, data->write_io_handle);
 
         } else if (status == NOT_ALL) {
             return;
@@ -127,84 +181,18 @@ void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
         return;
     }
 
-    data = (socket_data*)malloc(sizeof(socket_data));
-    if(data == NULL){
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        return;
-    }
-
-    read_io_handle = (struct ev_io*)malloc(sizeof(struct ev_io));
-    if (read_io_handle == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        free(data);
-        return;
-    }
-
-    write_io_handle = (struct ev_io*)malloc(sizeof(struct ev_io));
-    if (write_io_handle == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        free(data);
-        free(read_io_handle);
-        return;
-    }
-
-    w_data = (socket_write_data*)malloc(sizeof(socket_write_data));
-    if (w_data == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        free(data);
-        free(read_io_handle);
-        free(write_io_handle);
-    }
-
-    r_data = (socket_read_data*)malloc(sizeof(socket_read_data));
-    if (w_data == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        free(data);
-        free(w_data);
-        free(read_io_handle);
-        free(write_io_handle);
-    }
-
-    read_buffer = malloc(conf->buffer_size * sizeof(char));
-    if (read_buffer == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        free(data);
-        free(w_data);
-        free(r_data);
-        free(read_io_handle);
-        free(write_io_handle);
-    }
-
-    reqs = malloc(sizeof(requests));
-    if (reqs == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: malloc error - %s", err_msg));
-        close_with_check(socket_fd)
-        free(data);
-        free(r_data);
-        free(read_buffer);
-        free(read_io_handle);
-        free(w_data);
-        free(write_io_handle);
-    }
+    data = (socket_data*)wcalloc(sizeof(socket_data));
+    read_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
+    write_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
+    w_data = (socket_write_data*)wcalloc(sizeof(socket_write_data));
+    r_data = (socket_read_data*)wcalloc(sizeof(socket_read_data));
+    read_buffer = wcalloc(conf->buffer_size * sizeof(char));
+    reqs = wcalloc(sizeof(requests));
     reqs->first = reqs->last = NULL;
     reqs->count_req = 0;
 
     data->write_data = w_data;
-    data->write_data->answer = NULL;
-    data->write_data->size_answer = 0;
+    data->write_data->answers = NULL;
     data->write_io_handle = write_io_handle;
 
     data->read_data = r_data;

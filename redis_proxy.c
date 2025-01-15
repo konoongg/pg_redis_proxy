@@ -5,6 +5,7 @@
 #include "postmaster/bgworker.h"
 #include "utils/elog.h"
 
+#include "alloc.h"
 #include "cache.h"
 #include "command_processor.h"
 #include "config.h"
@@ -39,21 +40,18 @@ static void register_proxy(void) {
 
 void proxy_start_work(Datum main_arg) {
     ereport(INFO, errmsg("start bg worker pg_redis_proxy"));
-    config = (config_redis*) malloc(sizeof(config_redis));
-    if (config == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("proxy_start_work: malloc error - %s", err_msg));
-        abort();
-    }
+    config = (config_redis*) wcalloc(sizeof(config_redis));
     init_config(config);
     if (init_commands() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));
         abort();
     }
+    ereport(INFO, errmsg("finish init commands"));
     if (init_cache(&config->c_conf) != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_cache"));
         abort();
     }
+    ereport(INFO, errmsg("finish init cache"));
     if (init_workers(&config->worker_conf) != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_workers"));
         abort();

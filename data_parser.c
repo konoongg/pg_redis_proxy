@@ -4,6 +4,7 @@
 #include "postgres.h"
 #include "utils/elog.h"
 
+#include "alloc.h"
 #include "connection.h"
 #include "data_parser.h"
 
@@ -31,8 +32,6 @@ exit_status pars_data(socket_read_data* data) {
         read_status cur_status = data->parsing.cur_read_status;
         char* new_str;
 
-        ereport(INFO, errmsg("pars_data: c %d %c", c, c));
-
         if (c == '*' && cur_status == ARRAY_WAIT) {
             data->parsing.cur_read_status = ARGC_WAIT;
         } else if ((c >= '0' && c <= '9')  && (cur_status == NUM_WAIT || cur_status == ARGC_WAIT) ) {
@@ -40,37 +39,17 @@ exit_status pars_data(socket_read_data* data) {
         } else if (c == '\r' && cur_status == ARGC_WAIT) {
 
             if (data->reqs->first == NULL) {
-                data->reqs->first = (client_req*)malloc(sizeof(client_req));
-                if (data->reqs->first == NULL) {
-                    char* err_msg = strerror(errno);
-                    ereport(ERROR, errmsg("on_read_cb: read error - %s", err_msg));
-                    return ERR;
-                }
+                data->reqs->first = (client_req*)wcalloc(sizeof(client_req));
                 data->reqs->last = data->reqs->first;
             } else {
-                data->reqs->last->next = (client_req*)malloc(sizeof(client_req));
-                if (data->reqs->last->next  == NULL) {
-                    char* err_msg = strerror(errno);
-                    ereport(ERROR, errmsg("pars_data: read error - %s", err_msg));
-                    return ERR;
-                }
+                data->reqs->last->next = (client_req*)wcalloc(sizeof(client_req));
                 data->reqs->last = data->reqs->last->next;
             }
             data->reqs->last->next = NULL;
             data->reqs->last->argc = data->parsing.parsing_num;
-            data->reqs->last->argv = malloc(data->reqs->last->argc * sizeof(char*));
-            if (data->reqs->last->argv == NULL) {
-                char* err_msg = strerror(errno);
-                ereport(ERROR, errmsg("pars_data: malloc error - %s", err_msg));
-                return ERR;
-            }
+            data->reqs->last->argv = wcalloc(data->reqs->last->argc * sizeof(char*));
 
-            data->reqs->last->argv_size = malloc(data->reqs->last->argc * sizeof(int));
-            if (data->reqs->last->argv_size == NULL) {
-                char* err_msg = strerror(errno);
-                ereport(ERROR, errmsg("pars_data: malloc error - %s", err_msg));
-                return ERR;
-            }
+            data->reqs->last->argv_size = wcalloc(data->reqs->last->argc * sizeof(int));
 
             data->parsing.parsing_num = 0;
             data->parsing.next_read_status = START_STRING_WAIT;
@@ -84,12 +63,7 @@ exit_status pars_data(socket_read_data* data) {
         } else if (c == '\r' && cur_status == NUM_WAIT) {
             data->parsing.size_str = data->parsing.parsing_num;
             data->parsing.cur_size_str = 0;
-            data->parsing.parsing_str = (char*)malloc((data->parsing.size_str + 1)  * sizeof(char));
-            if (data->parsing.parsing_str  == NULL) {
-                char* err_msg = strerror(errno);
-                ereport(ERROR, errmsg("pars_data: read error - %s", err_msg));
-                return ERR;
-            }
+            data->parsing.parsing_str = (char*)wcalloc((data->parsing.size_str + 1)  * sizeof(char));
             data->parsing.next_read_status = STRING_WAIT;
             data->parsing.cur_read_status = LF;
             data->parsing.parsing_num = 0;
@@ -101,12 +75,7 @@ exit_status pars_data(socket_read_data* data) {
             if (data->parsing.cur_size_str == data->parsing.size_str) {
                 data->parsing.parsing_str[data->parsing.size_str] = '\0';
 
-                new_str = (char*)malloc((data->parsing.size_str + 1) * sizeof(char));
-                if (new_str == NULL) {
-                    char* err_msg = strerror(errno);
-                    ereport(ERROR, errmsg("pars_data: read error - %s", err_msg));
-                    return ERR;
-                }
+                new_str = (char*)wcalloc((data->parsing.size_str + 1) * sizeof(char));
 
                 memcpy(new_str, data->parsing.parsing_str, data->parsing.size_str + 1);
                 data->reqs->last->argv[data->parsing.cur_count_argv] = new_str;
@@ -124,9 +93,9 @@ exit_status pars_data(socket_read_data* data) {
                     data->parsing.next_read_status = START_STRING_WAIT;
                 }
             }
-        } else if(cur_status == END){
-            ereport(INFO, errmsg("pars_data: END"));
+        } else if(cur_status == END) {
             replace_part_of_buffer(data, cur_buffer_index);
+            data->parsing.cur_read_status = ARRAY_WAIT;
             return ALL;
         } else {
             ereport(ERROR, errmsg("pars_data: unknown parsing state"));

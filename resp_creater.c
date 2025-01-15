@@ -1,101 +1,94 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "postgres.h"
 #include "utils/elog.h"
 
+#include "alloc.h"
+#include "connection.h"
 #include "resp_creater.h"
+
+int create_num(answer* answ, int num);
 
 const char crlf[] = "\r\n";
 
 
-int create_simple_string_resp(char** result, char* src) {
-    int result_size = 1 + strlen(src) + 2;  // +<src>\n\r
+int create_simple_string_resp(answer* answ, char* src) {
+    int answ_size = 1 + strlen(src) + 2;  // +<src>\n\r
     int index = 0;
 
-    *result = malloc(result_size * sizeof(char));
-    if (*result == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("create_simple_string: malloc error - %s", err_msg));
-        return -1;
-    }
-    *result[index] = '+';
+    answ->answer = wcalloc(answ_size * sizeof(char));
+    answ->answer_size = answ_size;
+    answ->answer[index] = '+';
     index++;
 
-    memcpy(*result + index, src, strlen(src));
+    memcpy(answ->answer + index, src, strlen(src));
     index += strlen(src);
-    memcpy(*result + index, crlf, 2);
-    return result_size;
+    memcpy(answ->answer + index, crlf, 2);
+    return 0;
 }
 
-int create_bulk_string_resp(char** result, char* src, int size) {
+int create_bulk_string_resp(answer* answ, char* src, int size) {
     int index = 0;
+    int answ_size;
+    char str_size[MAX_STR_NUM_SIZE];
 
-    char str_size[20];
-    snprintf(str_size, 20, "%d", size);
+    snprintf(str_size, MAX_STR_NUM_SIZE, "%d", size);
 
-    int result_size = 1 + strlen(str_size) + 2 + size + 2;  // $<length>\r\n<data>\r\n
+    answ_size = 1 + strlen(str_size) + 2 + size + 2;  // $<length>\r\n<data>\r\n
 
-    *result = malloc(result_size * sizeof(char));
-    if (*result == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("create_bulk_string: malloc error - %s", err_msg));
-        return -1;
-    }
+    answ->answer = wcalloc(answ_size * sizeof(char));
+    answ->answer_size = answ_size;
 
-    *result[index] = '$';
+    answ->answer[index] = '$';
     index++;
 
-    memcpy(*result + index, str_size, strlen(str_size));
+    memcpy(answ->answer + index, str_size, strlen(str_size));
     index += strlen(str_size);
-    memcpy(*result + index, crlf, 2);
+    memcpy(answ->answer + index, crlf, 2);
     index += 2;
 
-    memcpy(*result + index, src, size);
+    memcpy(answ->answer + index, src, size);
     index += size;
-    memcpy(*result + index, crlf, 2);
-    return result_size;
+    memcpy(answ->answer + index, crlf, 2);
+    return 0;
 }
 
-int create_err_resp(char** result, char* src) {
-    int result_size = 1 + strlen(src) + 2;  // -<error message>\r\n - Error
+int create_err_resp(answer* answ, char* src) {
+    int answ_size = 1 + strlen(src) + 2;  // -<error message>\r\n - Error
     int index = 0;
 
-    *result = malloc(result_size * sizeof(char));
-    if (*result == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("create_err: malloc error - %s", err_msg));
-        return -1;
-    }
-    *result[index] = '-';
+    answ->answer = wcalloc(answ_size * sizeof(char));
+    answ->answer_size = answ_size;
+
+    answ->answer[index] = '-';
     index++;
 
-    memcpy(*result + index, src, strlen(src));
+    memcpy(answ->answer + index, src, strlen(src));
     index += strlen(src);
-    memcpy(*result + index, crlf, 2);
-    return result_size;
+    memcpy(answ->answer + index, crlf, 2);
+    return 0;
 }
 
-int create_num(char** result, int num) {
+int create_num(answer* answ, int num) {
+    char str_num[MAX_STR_NUM_SIZE];
+    int answ_size;
     int index = 0;
-    char str_num[20];
-    snprintf(str_num, 20, "%d", num);
 
-    int result_size = 1 + strlen(str_num) + 2; // :<integer>\r\n
+    snprintf(str_num, MAX_STR_NUM_SIZE, "%d", num);
 
-    *result = malloc(result_size * sizeof(char));
-    if (*result == NULL) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("create_num: malloc error - %s", err_msg));
-        return -1;
-    }
+    answ_size = 1 + strlen(str_num) + 2; // :<integer>\r\n
 
-    *result[index] = ':';
+    answ->answer = wcalloc(answ_size * sizeof(char));
+    answ->answer_size = answ_size;
+
+    answ->answer[index] = ':';
     index++;
-    memcpy(*result + index, str_num, strlen(str_num));
+    memcpy(answ->answer + index, str_num, strlen(str_num));
     index += strlen(str_num);
-    memcpy(*result + index, crlf, 2);
-    return result_size;
+    memcpy(answ->answer + index, crlf, 2);
+    return 0;
 }
 
