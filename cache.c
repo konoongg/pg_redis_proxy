@@ -37,7 +37,7 @@ int init_cache(cache_conf* conf) {
             storage->kv[j].lock = wcalloc(sizeof(pthread_spinlock_t));
             err = pthread_spin_init(storage->kv[j].lock, PTHREAD_PROCESS_PRIVATE);
             if (err != 0) {
-                ereport(ERROR, errmsg("init_cache: pthrpthread_spin_init() failed- %s\n", strerror(err)));
+                //ereport(ERROR, errmsg("init_cache: pthrpthread_spin_init() failed- %s\n", strerror(err)));
 
                 for (; i >= 0; --i) {
                     free_storage(db.storages[i]);
@@ -120,8 +120,8 @@ int set_cache(int cur_db, cache_data new_data) {
 
     data->last_time = time(NULL);
     if (data->last_time == -1) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("set: time error - %s", err_msg));
+        //char* err_msg = strerror(errno);
+        //ereport(ERROR, errmsg("set: time error - %s", err_msg));
         return -1;
     }
 
@@ -167,8 +167,7 @@ void free_storage(kv_storage storage) {
     for (int i = 0; i < storage.count_basket; ++i) {
         int err = pthread_spin_destroy(storage.kv[i].lock);
         if (err != 0) {
-            ereport(ERROR,
-                    errmsg("free_storage() failed - %s\n", strerror(err)));
+            //ereport(ERROR, errmsg("free_storage() failed - %s\n", strerror(err)));
         }
     }
 
@@ -196,7 +195,7 @@ int lock_cache_basket(int cur_db, char* key, int key_size) {
 
     int err = pthread_spin_lock(basket->lock);
     if (err != 0) {
-        ereport(ERROR, errmsg("lock_cache_basket: pthread_spin_lock() failed - %s", strerror(err)));
+        //ereport(ERROR, errmsg("lock_cache_basket: pthread_spin_lock() failed - %s", strerror(err)));
         return -1;
     }
 
@@ -211,7 +210,7 @@ int unlock_cache_basket(int cur_db, char* key, int key_size) {
 
     int err = pthread_spin_unlock(basket->lock);
     if (err != 0) {
-        ereport(ERROR, errmsg("unlock_cache_basket: pthread_spin_lock() failed - %s", strerror(err)));
+        //ereport(ERROR, errmsg("unlock_cache_basket: pthread_spin_lock() failed - %s", strerror(err)));
         return -1;
     }
     return 0;

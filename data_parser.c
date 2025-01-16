@@ -98,7 +98,7 @@ exit_status pars_data(socket_read_data* data) {
             data->parsing.cur_read_status = ARRAY_WAIT;
             return ALL;
         } else {
-            ereport(ERROR, errmsg("pars_data: unknown parsing state"));
+            //ereport(ERROR, errmsg("pars_data: unknown parsing state"));
             return ERR;
         }
     }

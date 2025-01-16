@@ -31,19 +31,19 @@ int socket_set_nonblock(int socket_fd) {
 
 //create listen tcp socket and return err ro fd thos socket
 int init_listen_socket(int listen_port, int backlog_size) {
+    //ereport(INFO, errmsg("init_listen_socket(): TEST tid: %d", gettid()));
     int err;
     const int val = 1;
     int listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     struct sockaddr_in sockaddr;
 
     if (listen_socket == -1) {
-        char* err_msg  =  strerror(errno);
-        ereport(ERROR, errmsg(" err socket(): %s", err_msg));
+        //ereport(ERROR, errmsg("init_listen_socket: err socket()"));
         return -1;
     }
 
     if (socket_set_nonblock(listen_socket) == -1) {
-        ereport(ERROR, errmsg("for listen socket set nonblocking mode fail"));
+        //ereport(ERROR, errmsg("init_listen_socket: for listen socket set nonblocking mode fail"));
         return -1;
     }
 
@@ -54,26 +54,26 @@ int init_listen_socket(int listen_port, int backlog_size) {
 
     err = setsockopt(listen_socket, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val));
 	if (err == -1) {
-        char* err_msg  =  strerror(errno);
-        ereport(ERROR, errmsg("setsockopt: %s", err_msg));
+        //char* err_msg  =  strerror(errno);
+        //ereport(ERROR, errmsg("setsockopt: %s", err_msg));
         return -1;
     }
 
     err = bind(listen_socket, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (err == -1) {
-        char* err_msg =  strerror(errno);
-        ereport(ERROR, errmsg("bind() error: %s %d", err_msg, listen_socket));
+        //char* err_msg =  strerror(errno);
+        //ereport(ERROR, errmsg("init_listen_socket: bind error -  %s %d", err_msg, listen_socket));
         return -1;
     }
 
     err = listen(listen_socket, backlog_size);
     if (err == -1) {
-        char* err_msg  =  strerror(errno);
-        ereport(ERROR, errmsg("listen() error: %s", err_msg));
+        //char* err_msg  =  strerror(errno);
+        //ereport(ERROR, errmsg("init_listen_socket: listen error - %s", err_msg));
         return -1;
     }
 
-    ereport(INFO, errmsg("init listen socket"));
+    //ereport(INFO, errmsg("init listen socket"));
     return listen_socket;
 }
 

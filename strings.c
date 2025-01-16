@@ -21,7 +21,7 @@ string* init_string(int size, char* data) {
 
     memcpy(str->str, data, str->size);
 
-    ereport(INFO, errmsg("init_string: FINISH"));
+    //ereport(INFO, errmsg("init_string: FINISH"));
     return str;
 }
 

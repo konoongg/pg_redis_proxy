@@ -78,7 +78,7 @@ void process_command(client_req* req, answer* answ) {
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
             int err = cur_command->command->func(req, answ);
             if (err != 0) {
-                ereport(INFO, errmsg("process_command: func err"));
+                //ereport(INFO, errmsg("process_command: func err"));
             }
         }
         cur_command = cur_command->next;

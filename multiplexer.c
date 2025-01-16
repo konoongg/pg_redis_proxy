@@ -17,8 +17,8 @@
 
 #define close_with_check(socket_fd) \
         if (close(socket_fd) == -1) { \
-            char* err_close  = strerror(errno); \
-            ereport(ERROR, errmsg("on_accept_cb: close error -  %s", err_close)); \
+            /*char* err_close  = strerror(errno);*/ \
+            /*ereport(ERROR, errmsg("on_accept_cb: close error -  %s", err_close));*/ \
         }
 
 void close_connection(EV_P_ struct ev_io* io_handle);
@@ -71,8 +71,8 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
             cur_answer = next_answer;
             w_data->answers = cur_answer;
         } else if (res == -1) {
-            char* err_msg = strerror(errno);
-            ereport(ERROR, errmsg("on_write_cb: write error %s  - ", err_msg));
+            //char* err_msg = strerror(errno);
+            //ereport(ERROR, errmsg("on_write_cb: write error %s  - ", err_msg));
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return;
             }
@@ -104,7 +104,7 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
     socket_write_data* w_data = data->write_data;
 
     if (revents & EV_ERROR) {
-        ereport(ERROR, errmsg("on_read_cb: EV_ERROR, close connection "));
+        //ereport(ERROR, errmsg("on_read_cb: EV_ERROR, close connection "));
         close_connection(loop, io_handle);
         return;
     }
@@ -112,7 +112,7 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
     free_buffer_size = r_data->buffer_size - r_data->cur_buffer_size;
     res = read(io_handle->fd, r_data->read_buffer + r_data->cur_buffer_size, free_buffer_size);
 
-    ereport(INFO, errmsg("on_read_cb: res %d free_buffer_size %d ", res, free_buffer_size));
+    //ereport(INFO, errmsg("on_read_cb: res %d free_buffer_size %d ", res, free_buffer_size));
     if (res > 0) {
         r_data->cur_buffer_size = res;
         status = pars_data(r_data);
@@ -148,12 +148,12 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
             return;
         }
     } else if (res == 0) {
-        ereport(WARNING, errmsg("on_read_cb: read warning, connection reset"));
+        //ereport(WARNING, errmsg("on_read_cb: read warning, connection reset"));
         close_connection(loop, io_handle);
         return;
     } else if (res < 0) {
-        char* err_msg = strerror(errno);
-        ereport(ERROR, errmsg("on_read_cb: read error - %s", err_msg));
+        //char* err_msg = strerror(errno);
+        //ereport(ERROR, errmsg("on_read_cb: read error - %s", err_msg));
         close_connection(loop, io_handle);
         return;
     }
@@ -176,8 +176,8 @@ void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
 
     socket_fd = accept(conf->listen_socket, NULL, NULL);
     if(socket_fd == -1){
-        char* err_msg  = strerror(errno);
-        ereport(ERROR, errmsg("on_accept_cb: accept error - %s", err_msg));
+        //char* err_msg  = strerror(errno);
+        //ereport(ERROR, errmsg("on_accept_cb: accept error - %s", err_msg));
         return;
     }
 
