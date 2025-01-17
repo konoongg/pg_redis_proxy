@@ -39,21 +39,21 @@ static void register_proxy(void) {
 }
 
 void proxy_start_work(Datum main_arg) {
-    //ereport(INFO, errmsg("start bg worker pg_redis_proxy"));
+    ereport(INFO, errmsg("start bg worker pg_redis_proxy"));
     config = (config_redis*) wcalloc(sizeof(config_redis));
     init_config(config);
     if (init_commands() != 0) {
-        //ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));
+        ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));
         abort();
     }
-    //ereport(INFO, errmsg("finish init commands"));
+    ereport(INFO, errmsg("finish init commands"));
     if (init_cache(&config->c_conf) != 0) {
-        //ereport(ERROR, errmsg("proxy_start_work: can't init_cache"));
+        ereport(ERROR, errmsg("proxy_start_work: can't init_cache"));
         abort();
     }
-    //ereport(INFO, errmsg("finish init cache"));
+    ereport(INFO, errmsg("finish init cache"));
     if (init_workers(&config->worker_conf) != 0) {
-        //ereport(ERROR, errmsg("proxy_start_work: can't init_workers"));
+        ereport(ERROR, errmsg("proxy_start_work: can't init_workers"));
         abort();
     }
 }

@@ -8,7 +8,7 @@ void defalt_setting_init(config_redis* config) {
     config->c_conf.mm_policy = noeviction;
     config->worker_conf.backlog_size = 512;
     config->worker_conf.buffer_size = 512;
-    config->worker_conf.count_worker = 4;
+    config->worker_conf.count_worker = 1;
     config->worker_conf.listen_port = 6379;
 }
 

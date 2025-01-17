@@ -67,17 +67,17 @@ int init_workers(init_worker_conf* conf) {
     for (int i = 0; i < conf->count_worker; ++i) {
         int err = pthread_create(&(tids[i]), NULL, start_worker, conf);
         if (err) {
-            //ereport(ERROR, errmsg("init_worker: pthread_create error %s", strerror(err)));
+            ereport(ERROR, errmsg("init_worker: pthread_create error %s", strerror(err)));
             abort();
         }
     }
 
-    //ereport(INFO, errmsg("start all workers (%d)", conf->count_worker));
+    ereport(INFO, errmsg("start all workers (%d)", conf->count_worker));
 
     for (int i = 0; i < conf->count_worker; ++i) {
         int err = pthread_join(tids[i], NULL);
         if (err) {
-            //ereport(ERROR, errmsg("init_worker: pthread_join error %s", strerror(err)));
+            ereport(ERROR, errmsg("init_worker: pthread_join error %s", strerror(err)));
             abort();
         }
     }

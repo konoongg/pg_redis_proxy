@@ -68,5 +68,6 @@ uint64_t murmur_hash_2(char* key, int len, int count_basket, void* argv) {
     h *= m;
     h ^= h >> 15;
     h %=  count_basket;
+    ereport(INFO, errmsg("murmur_hash_2: key %s hash %d", key, h));
     return h;
 }

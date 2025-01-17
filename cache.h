@@ -22,7 +22,7 @@ int init_cache(cache_conf* conf);
 int lock_cache_basket(int cur_db, char* key, int key_size);
 int set_cache(int cur_db, cache_data new_data);
 int unlock_cache_basket(int cur_db, char* key, int key_size);
-void free_cache_key(int cur_db, char* key, int key_size);
+int free_cache_key(int cur_db, char* key, int key_size);
 void free_cache(void);
 
 enum data_type {

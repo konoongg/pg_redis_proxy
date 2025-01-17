@@ -27,6 +27,8 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
 
 
 void close_connection(EV_P_ struct ev_io* io_handle) {
+
+    ereport(INFO, errmsg("close_connection: close_connection"));
     socket_data* data = io_handle->data;
     client_req* cur_req;
     answer* cur_answer;
@@ -48,6 +50,9 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
         cur_answer = next_answer;
     }
 
+    ev_io_stop(loop, data->write_io_handle);
+    ev_io_stop(loop, data->read_io_handle);
+
     free(data->read_data->reqs);
     free(data->read_data->parsing.parsing_str);
     free(data->read_data->read_buffer);
@@ -58,12 +63,23 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
     free(data);
 }
 
+void free_req(client_req* req) {
+    for (int i = 0; i < req->argc; ++i) {
+        free(req->argv[i]);
+    }
+    free(req->argv);
+    free(req);
+}
+
 void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
+    ereport(INFO, errmsg("on_write_cb: TEST io_handle->fd %d", io_handle->fd));
     socket_data* data = (socket_data*)io_handle->data;
     socket_write_data* w_data = data->write_data;
     answer* cur_answer = w_data->answers;
     while (cur_answer != NULL) {
+        ereport(INFO, errmsg("on_write_cb: cur_answer != NULL"));
         int res =  write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
+        ereport(INFO, errmsg("on_write_cb: res %d cur_answer->answer_size %d", res, cur_answer->answer_size));
         if (res == cur_answer->answer_size) {
             answer* next_answer = cur_answer->next;
             free(cur_answer->answer);
@@ -85,7 +101,10 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
         }
     }
     w_data->answers = NULL;
-    ev_io_stop(loop, data->write_io_handle);
+
+    ereport(INFO, errmsg("on_write_cb: ev_io_stop"));
+    ev_io_stop(loop, io_handle);
+    ereport(INFO, errmsg("on_write_cb: FINIHS"));
 }
 
 /*
@@ -93,7 +112,9 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
  * All operations are performed until all incoming data is read, which is necessary to process all requests.
  */
 void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
+    ereport(INFO, errmsg("on_read_cb: TEST"));
     client_req* cur_req;
+    client_req* next_req;
     answer* cur_answer;
     answer* prev_answer;
     exit_status status;
@@ -117,10 +138,12 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
         r_data->cur_buffer_size = res;
         status = pars_data(r_data);
         if (status == ERR) {
+            ereport(INFO, errmsg("on_read_cb: status ERR"));
             close_connection(loop, io_handle);
             return;
         } else if (status == ALL) {
             while (status == ALL) {
+                ereport(INFO, errmsg("on_read_cb: status ALL"));
                 status = pars_data(r_data);
             }
 
@@ -131,20 +154,25 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
             cur_answer = w_data->answers;
             prev_answer = NULL;
             while (cur_req != NULL) {
+                ereport(INFO, errmsg("on_read_cb: cur_req != NULL"));
                 if (cur_answer == NULL) {
                     cur_answer = wcalloc(sizeof(answer));
                     w_data->answers->next = NULL;
                     prev_answer->next = cur_answer;
                 }
                 process_command(cur_req, cur_answer);
-                cur_req = cur_req->next;
+                next_req = cur_req->next;
+                free_req(cur_req);
+                cur_req = next_req;
                 prev_answer = cur_answer;
                 cur_answer = cur_answer->next;
             }
 
+            ereport(INFO, errmsg("on_read_cb: start write io_handle->fd %d", io_handle->fd));
             ev_io_start(loop, data->write_io_handle);
 
         } else if (status == NOT_ALL) {
+            ereport(INFO, errmsg("on_read_cb: status NOT ALL"));
             return;
         }
     } else if (res == 0) {
@@ -164,6 +192,8 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
 //If there are any issues with connecting a new client, we don't want the entire proxy to break,
 //so we simply log a failure message.
 void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
+
+    ereport(INFO, errmsg("on_accept_cb: TEST"));
     char* read_buffer;
     accept_conf* conf = (accept_conf*)io_handle->data;
     int socket_fd;

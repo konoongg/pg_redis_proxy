@@ -53,6 +53,7 @@ int init_cache(cache_conf* conf) {
 cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     cache_data* data = basket->first;
     while (data != NULL) {
+        ereport(INFO, errmsg("find_data_in_basket: data->key %s data->data %s %p", data->key, (char*)data->data, data->data));
         if (memcmp(data->key, key, key_size) == 0 &&
             data->key_size == key_size) {
             return data;
@@ -68,13 +69,15 @@ cache_get_result get_cache(int cur_db, cache_data new_data) {
     cache_basket* basket = &(storage.kv[hash]);
     cache_get_result get_result;
 
-    cache_data* data =
-        find_data_in_basket(basket, new_data.key, new_data.key_size);
+    ereport(INFO, errmsg("get_cache: find_data_in_basket(basket, new_data.key:%s, new_data.key_size:%d);", new_data.key, new_data.key_size));
+    cache_data* data = find_data_in_basket(basket, new_data.key, new_data.key_size);
     if (data != NULL) {
         if (data->d_type != new_data.d_type) {
+            ereport(INFO, errmsg("get_cache:data->d_type != new_data.d_typ"));
             get_result.err = true;
             get_result.err_mes = wrong_type;
         } else {
+            ereport(INFO, errmsg("get_cache:get_result.result = data->data: %s", (char*)data->data));
             get_result.result = data->data;
             get_result.err = false;
         }
@@ -91,8 +94,9 @@ int set_cache(int cur_db, cache_data new_data) {
     u_int64_t hash = db.hash_func(new_data.key, new_data.key_size, storage.count_basket, NULL);
     cache_basket* basket = &(storage.kv[hash]);
     cache_data* data = basket->first;
-
+    ereport(INFO, errmsg("set_cache: START  data  %p",data));
     while (data != NULL) {
+        //ereport(INFO, errmsg("set_cache: data != NULL "));
         if (memcmp(data->key, new_data.key, new_data.key_size) == 0 &&
             data->key_size == new_data.key_size) {
             if (data->d_type != new_data.d_type) {
@@ -100,23 +104,30 @@ int set_cache(int cur_db, cache_data new_data) {
             }
             break;
         }
+        data = data->next;
     }
 
     if (data == NULL) {
         data = wcalloc(sizeof(cache_data));
         memset(data, 0, sizeof(cache_data));
 
+        ereport(INFO, errmsg("set_cache: new  data  %p data->data->",data));
         if (basket->first == NULL) {
             basket->first = basket->last = data;
         } else {
             basket->last->next = data;
             basket->last = basket->last->next;
         }
+        ereport(INFO, errmsg("set_cache: new_data.key_size  %d", new_data.key_size));
         data->key = wcalloc(new_data.key_size * sizeof(char*));
         data->next = NULL;
         memcpy(data->key, new_data.key, new_data.key_size);
         data->key_size = new_data.key_size;
+        data->free_data = new_data.free_data;
     }
+
+
+    ereport(INFO, errmsg("set_cache: data  %p data_>next %p",data , data->next));
 
     data->last_time = time(NULL);
     if (data->last_time == -1) {
@@ -124,16 +135,19 @@ int set_cache(int cur_db, cache_data new_data) {
         //ereport(ERROR, errmsg("set: time error - %s", err_msg));
         return -1;
     }
-
+    ereport(INFO, errmsg("set_cache: AFTER  data->data  %p new_data.data %p", data->data , new_data.data));
     if (data->data != NULL) {
         data->free_data(data->data);
     }
+
     data->data = new_data.data;
 
+    ereport(INFO, errmsg("set_cache: BEFORE data->data  %p new_data.data %p",data->data , new_data.data));
     return 0;
 }
 
-void free_cache_key(int cur_db, char* key, int key_size) {
+int free_cache_key(int cur_db, char* key, int key_size) {
+    ereport(INFO, errmsg("free_cache_key: TEST"));
     kv_storage storage = db.storages[cur_db];
     u_int64_t hash = db.hash_func(key, key_size, storage.count_basket, NULL);
     cache_basket* basket = &(storage.kv[hash]);
@@ -150,15 +164,15 @@ void free_cache_key(int cur_db, char* key, int key_size) {
     }
 
     if (data == NULL) {
-        return;
+        return 0;
     } else if (data == basket->first) {
         basket->first = data->next;
     } else {
         prev_data->next = data->next;
     }
-
     data->free_data(data->data);
     free(data);
+    return 1;
 }
 
 void free_storage(kv_storage storage) {
@@ -220,9 +234,12 @@ cache_data create_data(char* key, int key_size, void* data, data_type d_type, vo
     cache_data new_data;
     memset(&new_data, 0, sizeof(new_data));
 
+    ereport(INFO, errmsg("create_data: data - %p", data));
     new_data.key_size = key_size;
     new_data.key = key;
     new_data.d_type = d_type;
     new_data.free_data = free_data;
+    new_data.data = data;
+    ereport(INFO, errmsg("create_data: new_data.data - %p", new_data.data));
     return new_data;
 }
