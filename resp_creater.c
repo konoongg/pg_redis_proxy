@@ -31,7 +31,7 @@ int create_simple_string_resp(answer* answ, char* src) {
 }
 
 int create_bulk_string_resp(answer* answ, char* src, int size) {
-    ereport(INFO, errmsg("create_bulk_string_resp: TEST"));
+    //ereport(INFO, errmsg("create_bulk_string_resp: TEST"));
     int index = 0;
     int answ_size;
     char str_size[MAX_STR_NUM_SIZE];
@@ -55,7 +55,7 @@ int create_bulk_string_resp(answer* answ, char* src, int size) {
     index += size;
     memcpy(answ->answer + index, crlf, 2);
 
-    ereport(INFO, errmsg("create_bulk_string_resp: answ->answer %s", answ->answer));
+    //ereport(INFO, errmsg("create_bulk_string_resp: answ->answer %s", answ->answer));
     return 0;
 }
 

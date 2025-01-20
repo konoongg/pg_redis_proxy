@@ -71,14 +71,14 @@ int init_commands(void) {
 // This implementation allows for quickly
 // finding the function associated with a command in a short amount of time.
 void process_command(client_req* req, answer* answ) {
-    ereport(INFO, errmsg("process_command: TEST %s %s %d", req->argv[0], req->argv[1], req->argc));
+    //ereport(INFO, errmsg("process_command: TEST %s %s %d", req->argv[0], req->argv[1], req->argc));
     int hash = com_dict->hash_func(req->argv[0]);
     int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;
     while (cur_command != NULL) {
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
 
-            ereport(INFO, errmsg("COMMAND %s ", cur_command->command->name));
+            //ereport(INFO, errmsg("COMMAND %s ", cur_command->command->name));
             int err = cur_command->command->func(req, answ);
             if (err != 0) {
                 //ereport(INFO, errmsg("process_command: func err"));
@@ -87,5 +87,5 @@ void process_command(client_req* req, answer* answ) {
         cur_command = cur_command->next;
     }
 
-    ereport(INFO, errmsg("process_command: FINISH "));
+    //ereport(INFO, errmsg("process_command: FINISH "));
 }

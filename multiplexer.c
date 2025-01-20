@@ -21,14 +21,30 @@
             /*ereport(ERROR, errmsg("on_accept_cb: close error -  %s", err_close));*/ \
         }
 
+#define free_req(req) \
+    if (req != NULL) { \
+        for (int i = 0; i < req->argc; ++i) { \
+            free(req->argv[i]); \
+        } \
+        free(req->argv); \
+        free(req); \
+        req = NULL; \
+    }
+
+
+#define free_answer(answ) \
+    if (answ != NULL) { \
+        free(answ->answer); \
+        free(answ); \
+        answ = NULL; \
+    }
+
 void close_connection(EV_P_ struct ev_io* io_handle);
-void on_write_cb(EV_P_ struct ev_io* io_handle, int revents);
 void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
-
-
+void on_write_cb(EV_P_ struct ev_io* io_handle, int revents);
 void close_connection(EV_P_ struct ev_io* io_handle) {
 
-    ereport(INFO, errmsg("close_connection: close_connection"));
+    //ereport(INFO, errmsg("close_connection: close_connection"));
     socket_data* data = io_handle->data;
     client_req* cur_req;
     answer* cur_answer;
@@ -38,15 +54,14 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
     cur_req = data->read_data->reqs->first;
     while(cur_req != NULL) {
         client_req* req = cur_req->next;
-        free(cur_req);
+        free_req(cur_req);
         cur_req = req;
     }
 
     cur_answer = data->write_data->answers;
     while(cur_answer != NULL) {
         answer* next_answer = cur_answer->next;
-        free(cur_answer->answer);
-        free(cur_answer);
+        free_answer(cur_answer);
         cur_answer = next_answer;
     }
 
@@ -63,27 +78,19 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
     free(data);
 }
 
-void free_req(client_req* req) {
-    for (int i = 0; i < req->argc; ++i) {
-        free(req->argv[i]);
-    }
-    free(req->argv);
-    free(req);
-}
 
 void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
-    ereport(INFO, errmsg("on_write_cb: TEST io_handle->fd %d", io_handle->fd));
+    //ereport(INFO, errmsg("on_write_cb: TEST io_handle->fd %d", io_handle->fd));
     socket_data* data = (socket_data*)io_handle->data;
     socket_write_data* w_data = data->write_data;
     answer* cur_answer = w_data->answers;
     while (cur_answer != NULL) {
-        ereport(INFO, errmsg("on_write_cb: cur_answer != NULL"));
+        //ereport(INFO, errmsg("on_write_cb: cur_answer != NULL"));
         int res =  write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
-        ereport(INFO, errmsg("on_write_cb: res %d cur_answer->answer_size %d", res, cur_answer->answer_size));
+        //ereport(INFO, errmsg("on_write_cb: res %d cur_answer->answer_size %d", res, cur_answer->answer_size));
         if (res == cur_answer->answer_size) {
             answer* next_answer = cur_answer->next;
-            free(cur_answer->answer);
-            free(cur_answer);
+            free_answer(cur_answer);
             cur_answer = next_answer;
             w_data->answers = cur_answer;
         } else if (res == -1) {
@@ -102,9 +109,9 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
     }
     w_data->answers = NULL;
 
-    ereport(INFO, errmsg("on_write_cb: ev_io_stop"));
+    //ereport(INFO, errmsg("on_write_cb: ev_io_stop"));
     ev_io_stop(loop, io_handle);
-    ereport(INFO, errmsg("on_write_cb: FINIHS"));
+    //ereport(INFO, errmsg("on_write_cb: FINIHS"));
 }
 
 /*
@@ -112,7 +119,7 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
  * All operations are performed until all incoming data is read, which is necessary to process all requests.
  */
 void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
-    ereport(INFO, errmsg("on_read_cb: TEST"));
+    //ereport(INFO, errmsg("on_read_cb: TEST"));
     client_req* cur_req;
     client_req* next_req;
     answer* cur_answer;
@@ -138,12 +145,12 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
         r_data->cur_buffer_size = res;
         status = pars_data(r_data);
         if (status == ERR) {
-            ereport(INFO, errmsg("on_read_cb: status ERR"));
+            //ereport(INFO, errmsg("on_read_cb: status ERR"));
             close_connection(loop, io_handle);
             return;
         } else if (status == ALL) {
             while (status == ALL) {
-                ereport(INFO, errmsg("on_read_cb: status ALL"));
+                //ereport(INFO, errmsg("on_read_cb: status ALL"));
                 status = pars_data(r_data);
             }
 
@@ -154,7 +161,7 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
             cur_answer = w_data->answers;
             prev_answer = NULL;
             while (cur_req != NULL) {
-                ereport(INFO, errmsg("on_read_cb: cur_req != NULL"));
+                //ereport(INFO, errmsg("on_read_cb: cur_req != NULL"));
                 if (cur_answer == NULL) {
                     cur_answer = wcalloc(sizeof(answer));
                     w_data->answers->next = NULL;
@@ -168,15 +175,17 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
                 cur_answer = cur_answer->next;
             }
 
-            ereport(INFO, errmsg("on_read_cb: start write io_handle->fd %d", io_handle->fd));
+            r_data->reqs->last = r_data->reqs->first = NULL;
+
+            //ereport(INFO, errmsg("on_read_cb: start write io_handle->fd %d", io_handle->fd));
             ev_io_start(loop, data->write_io_handle);
 
         } else if (status == NOT_ALL) {
-            ereport(INFO, errmsg("on_read_cb: status NOT ALL"));
+            //ereport(INFO, errmsg("on_read_cb: status NOT ALL"));
             return;
         }
     } else if (res == 0) {
-        //ereport(WARNING, errmsg("on_read_cb: read warning, connection reset"));
+        //ereport(INFO, errmsg("on_read_cb: read warning, connection reset"));
         close_connection(loop, io_handle);
         return;
     } else if (res < 0) {
@@ -193,7 +202,7 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
 //so we simply log a failure message.
 void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
 
-    ereport(INFO, errmsg("on_accept_cb: TEST"));
+    //ereport(INFO, errmsg("on_accept_cb: TEST"));
     char* read_buffer;
     accept_conf* conf = (accept_conf*)io_handle->data;
     int socket_fd;

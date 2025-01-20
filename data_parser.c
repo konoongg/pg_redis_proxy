@@ -32,17 +32,17 @@ exit_status pars_data(socket_read_data* data) {
         read_status cur_status = data->parsing.cur_read_status;
         char* new_str;
 
-        ereport(INFO, errmsg("pars_data: c %d %c", c, c));
+        //ereport(INFO, errmsg("pars_data: c %d %c", c, c));
 
         if (c == '*' && cur_status == ARRAY_WAIT) {
-            ereport(INFO, errmsg("pars_data: 1 cur_status == ARRAY_WAIT"));
+            //ereport(INFO, errmsg("pars_data: 1 cur_status == ARRAY_WAIT"));
             data->parsing.cur_read_status = ARGC_WAIT;
         } else if ((c >= '0' && c <= '9')  && (cur_status == NUM_WAIT || cur_status == ARGC_WAIT) ) {
-            ereport(INFO, errmsg("pars_data: 2 cur_status == NUM_WAIT || ARGC_WAIT"));
+            //ereport(INFO, errmsg("pars_data: 2 cur_status == NUM_WAIT || ARGC_WAIT"));
             data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
         } else if (c == '\r' && cur_status == ARGC_WAIT) {
 
-            ereport(INFO, errmsg("pars_data: 3 cur_status == ARGC_WAIT"));
+            //ereport(INFO, errmsg("pars_data: 3 cur_status == ARGC_WAIT"));
             if (data->reqs->first == NULL) {
                 data->reqs->first = (client_req*)wcalloc(sizeof(client_req));
                 data->reqs->last = data->reqs->first;
@@ -60,17 +60,17 @@ exit_status pars_data(socket_read_data* data) {
             data->parsing.next_read_status = START_STRING_WAIT;
             data->parsing.cur_read_status = LF;
         } else if (c == '\r' && cur_status == CR) {
-            ereport(INFO, errmsg("pars_data: 4 cur_status == CR"));
+            //ereport(INFO, errmsg("pars_data: 4 cur_status == CR"));
             data->parsing.cur_read_status = LF;
         } else if (c == '\n' && cur_status == LF) {
-            ereport(INFO, errmsg("pars_data: 5 cur_status == LF"));
+            //ereport(INFO, errmsg("pars_data: 5 cur_status == LF"));
             data->parsing.cur_read_status = data->parsing.next_read_status;
         } else if (c == '$' && cur_status == START_STRING_WAIT) {
-            ereport(INFO, errmsg("pars_data: 6 cur_status == START_STRING_WAIT"));
+            //ereport(INFO, errmsg("pars_data: 6 cur_status == START_STRING_WAIT"));
             data->parsing.cur_read_status = NUM_WAIT;
         } else if (c == '\r' && cur_status == NUM_WAIT) {
 
-            ereport(INFO, errmsg("pars_data: 7 cur_status == NUM_WAIT"));
+            //ereport(INFO, errmsg("pars_data: 7 cur_status == NUM_WAIT"));
             data->parsing.size_str = data->parsing.parsing_num;
             data->parsing.cur_size_str = 0;
             data->parsing.parsing_str = (char*)wcalloc((data->parsing.size_str + 1)  * sizeof(char));
@@ -79,7 +79,7 @@ exit_status pars_data(socket_read_data* data) {
             data->parsing.parsing_num = 0;
         } else if (cur_status == STRING_WAIT) {
 
-            ereport(INFO, errmsg("pars_data: 8 cur_status == STRING_WAIT"));
+            //ereport(INFO, errmsg("pars_data: 8 cur_status == STRING_WAIT"));
             data->parsing.parsing_str[data->parsing.cur_size_str] = c;
             data->parsing.cur_size_str += 1;
 
@@ -98,7 +98,7 @@ exit_status pars_data(socket_read_data* data) {
 
 
 
-                ereport(INFO, errmsg("pars_data: data->parsing.cur_count_argv(%d) == data->reqs->last->argc(%d) ",data->parsing.cur_count_argv,  data->reqs->last->argc));
+                //ereport(INFO, errmsg("pars_data: data->parsing.cur_count_argv(%d) == data->reqs->last->argc(%d) ",data->parsing.cur_count_argv,  data->reqs->last->argc));
                 if (data->parsing.cur_count_argv == data->reqs->last->argc) {
                     data->parsing.cur_count_argv = 0;
                     data->parsing.cur_read_status = CR;
@@ -109,12 +109,12 @@ exit_status pars_data(socket_read_data* data) {
                 }
             }
         } else if(cur_status == END) {
-            ereport(INFO, errmsg("pars_data:9 cur_status == END"));
+            //ereport(INFO, errmsg("pars_data:9 cur_status == END"));
             replace_part_of_buffer(data, cur_buffer_index);
             data->parsing.cur_read_status = ARRAY_WAIT;
             return ALL;
         } else {
-            ereport(INFO, errmsg("pars_data: 10 unknown parsing state"));
+            //ereport(INFO, errmsg("pars_data: 10 unknown parsing state"));
             return ERR;
         }
     }

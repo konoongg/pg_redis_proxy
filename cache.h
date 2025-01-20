@@ -9,20 +9,19 @@
 #include "config.h"
 
 typedef enum data_type data_type;
+typedef struct cache cache;
 typedef struct cache_basket cache_basket;
 typedef struct cache_data cache_data;
-typedef struct kv_db kv_db;
-typedef struct kv_storage kv_storage;
 typedef struct cache_get_result cache_get_result;
+typedef struct kv_storage kv_storage;
 
-cache_data create_data(char* key, int key_size, void* data, data_type d_type,
-                       void (*free_data)(void* data));
-cache_get_result get_cache(int cur_db, cache_data new_data);
+cache_data create_data(char* key, int key_size, void* data, data_type d_type,  void (*free_data)(void* data));
+cache_get_result get_cache(cache_data new_data);
+int delete_cache(char* key, int key_size);
 int init_cache(cache_conf* conf);
-int lock_cache_basket(int cur_db, char* key, int key_size);
-int set_cache(int cur_db, cache_data new_data);
-int unlock_cache_basket(int cur_db, char* key, int key_size);
-int free_cache_key(int cur_db, char* key, int key_size);
+int lock_cache_basket(char* key, int key_size);
+int set_cache(cache_data new_data);
+int unlock_cache_basket(char* key, int key_size);
 void free_cache(void);
 
 enum data_type {
@@ -53,13 +52,15 @@ struct cache_basket {
 
 struct kv_storage {
     cache_basket* kv;
-    int count_basket;
+    uint64_t (*hash_func)(char* key, int key_size, int count_basket, void* argv);
 };
 
-struct kv_db {
-    int count_db;
-    kv_storage* storages;
-    uint64_t (*hash_func)(char* key, int key_size, int count_basket, void* argv);
+struct cache {
+    cache_get_result (*get)(cache_data new_data);
+    int (*set)(cache_data new_data);
+    int (*delete)(char* key, int key_size);
+    kv_storage* storage;
+    int count_basket;
 };
 
 #endif

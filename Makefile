@@ -21,7 +21,7 @@ OBJS = \
 EXTENSION = pg_redis_proxy
 DATA = pg_redis_proxy--1.1.sql
 
-SHLIB_LINK += -lev
+SHLIB_LINK += -lpq -lev
 
 ifdef USE_PGXS
 	PG_CONFIG = pg_config
