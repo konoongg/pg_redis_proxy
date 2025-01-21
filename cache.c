@@ -66,25 +66,16 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     return NULL;
 }
 
-cache_get_result get_cache(cache_data new_data) {
+void* get_cache(cache_data new_data) {
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
     cache_get_result get_result;
 
     cache_data* data = find_data_in_basket(basket, new_data.key, new_data.key_size);
     if (data != NULL) {
-        if (data->d_type != new_data.d_type) {
-            get_result.err = true;
-            get_result.err_mes = wrong_type;
-        } else {
-            get_result.result = data->data;
-            get_result.err = false;
-        }
-        return get_result;
+        return data->data;
     }
 
-    get_result.result = NULL;
-    get_result.err = false;
-    return get_result;
+    return NULL;
 }
 
 int set_cache(cache_data new_data) {
@@ -195,12 +186,11 @@ int unlock_cache_basket(char* key, int key_size) {
     return 0;
 }
 
-cache_data create_data(char* key, int key_size, void* data, data_type d_type, void (*free_data)(void* data)) {
+cache_data create_data(char* key, int key_size, void* data, void (*free_data)(void* data)) {
     cache_data new_data;
     memset(&new_data, 0, sizeof(new_data));
     new_data.key_size = key_size;
     new_data.key = key;
-    new_data.d_type = d_type;
     new_data.free_data = free_data;
     new_data.data = data;
     return new_data;

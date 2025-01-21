@@ -4,13 +4,14 @@
 typedef enum exit_status exit_status;
 typedef enum read_status read_status;
 typedef struct answer answer;
+typedef struct answer_list answer_list;
 typedef struct client_req client_req;
 typedef struct clinet clinet;
+typedef struct db_connect db_connect;
 typedef struct socket_data socket_data;
 typedef struct socket_parsing socket_parsing;
 typedef struct socket_read_data socket_read_data;
 typedef struct socket_write_data socket_write_data;
-
 // parsers status
 enum read_status {
     ARRAY_WAIT,
@@ -70,18 +71,29 @@ struct answer {
     answer* next;
 };
 
+struct answer_list {
+    answer* first;
+    answer* last;
+};
+
 // struct with ev_io WRITE
 struct socket_write_data {
-    answer* answers;
+    answer_list* answers;
+};
+
+struct db_connect {
+    int pipe_to_db[2];
+    bool finish_read;
 };
 
 // struct with connect
 struct socket_data {
-    //clinet* cli;
     socket_write_data* write_data;
     socket_read_data* read_data;
+    db_connect* db_conn;
     struct ev_io* write_io_handle;
     struct ev_io* read_io_handle;
+    struct ev_io* read_db_handle;
 };
 
 struct clinet {

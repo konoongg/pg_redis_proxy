@@ -32,17 +32,12 @@ exit_status pars_data(socket_read_data* data) {
         read_status cur_status = data->parsing.cur_read_status;
         char* new_str;
 
-        //ereport(INFO, errmsg("pars_data: c %d %c", c, c));
-
         if (c == '*' && cur_status == ARRAY_WAIT) {
-            //ereport(INFO, errmsg("pars_data: 1 cur_status == ARRAY_WAIT"));
             data->parsing.cur_read_status = ARGC_WAIT;
         } else if ((c >= '0' && c <= '9')  && (cur_status == NUM_WAIT || cur_status == ARGC_WAIT) ) {
-            //ereport(INFO, errmsg("pars_data: 2 cur_status == NUM_WAIT || ARGC_WAIT"));
             data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
         } else if (c == '\r' && cur_status == ARGC_WAIT) {
 
-            //ereport(INFO, errmsg("pars_data: 3 cur_status == ARGC_WAIT"));
             if (data->reqs->first == NULL) {
                 data->reqs->first = (client_req*)wcalloc(sizeof(client_req));
                 data->reqs->last = data->reqs->first;

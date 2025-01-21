@@ -10,7 +10,6 @@ OBJS = \
 	config.o \
 	data_parser.o \
 	hash.o \
-	multiplexer.o \
 	redis_proxy.o \
 	resp_creater.o \
 	socket_wrapper.o \

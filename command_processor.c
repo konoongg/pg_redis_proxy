@@ -9,9 +9,9 @@
 #include "cache.h"
 #include "command_processor.h"
 #include "connection.h"
+#include "db.h"
 #include "hash.h"
 #include "resp_creater.h"
-#include "strings.h"
 
 command_dict* com_dict;
 
@@ -22,6 +22,37 @@ redis_command commands[] = {
     {"get", do_get},
     {"set", do_set},
 };
+
+process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
+    answer* res;
+    if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
+        create_err_resp(answ, "ERR syntax error");
+        return PROCESS_ERR;
+    }
+
+    res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
+
+    if (res == NULL) {
+        register_command();
+        return DB_REQ;
+    }
+
+    answ->answer = wcalloc(res->answer_size * sizeof(char));
+    memcpy(answ->answer, res->answer, res->answer_size);
+
+    if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
+        create_err_resp(answ, "ERR syntax error");
+        return -1;
+    }
+}
+
+process_result do_set(client_req* req, answer* answ) {
+
+}
+
+process_result do_del(client_req* req, answer* answ) {
+
+}
 
 void free_command(int hash);
 void create_err(char* answer, char* err);
@@ -70,22 +101,15 @@ int init_commands(void) {
 // finds the corresponding function in the dictionary by the command name, and calls it.
 // This implementation allows for quickly
 // finding the function associated with a command in a short amount of time.
-void process_command(client_req* req, answer* answ) {
-    //ereport(INFO, errmsg("process_command: TEST %s %s %d", req->argv[0], req->argv[1], req->argc));
+process_result process_command(client_req* req, answer* answ) {
     int hash = com_dict->hash_func(req->argv[0]);
     int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;
     while (cur_command != NULL) {
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
-
-            //ereport(INFO, errmsg("COMMAND %s ", cur_command->command->name));
-            int err = cur_command->command->func(req, answ);
-            if (err != 0) {
-                //ereport(INFO, errmsg("process_command: func err"));
-            }
+            return cur_command->command->func(req, answ);
         }
         cur_command = cur_command->next;
     }
-
-    //ereport(INFO, errmsg("process_command: FINISH "));
+    return PROCESS_ERR;
 }

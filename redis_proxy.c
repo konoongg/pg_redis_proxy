@@ -20,7 +20,7 @@ static void register_proxy(void);
 PGDLLEXPORT void proxy_start_work(Datum main_arg);
 void clean_up(void);
 
-config_redis* config = NULL;
+config_redis config;
 
 void _PG_init(void) {
     register_proxy();

@@ -14,9 +14,10 @@ typedef struct cache_basket cache_basket;
 typedef struct cache_data cache_data;
 typedef struct cache_get_result cache_get_result;
 typedef struct kv_storage kv_storage;
+typedef struct pending pending;
 
-cache_data create_data(char* key, int key_size, void* data, data_type d_type,  void (*free_data)(void* data));
-cache_get_result get_cache(cache_data new_data);
+cache_data create_data(char* key, int key_size, void* data, void (*free_data)(void* data));
+void* get_cache(cache_data new_data);
 int delete_cache(char* key, int key_size);
 int init_cache(cache_conf* conf);
 int lock_cache_basket(char* key, int key_size);
@@ -24,24 +25,19 @@ int set_cache(cache_data new_data);
 int unlock_cache_basket(char* key, int key_size);
 void free_cache(void);
 
-enum data_type {
-    STRING,
+struct pending {
+    pending* next;
+    int pipe_fd;
 };
 
 struct cache_data {
     cache_data* next;
     char* key;
     int key_size;
-    data_type d_type;
     time_t last_time;
     void* data;
     void (*free_data)(void* data);
-};
-
-struct cache_get_result {
-    void* result;
-    bool err;
-    char* err_mes;
+    pending* pending_list;
 };
 
 struct cache_basket {
