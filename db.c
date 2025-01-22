@@ -2,14 +2,15 @@
 #include "postgres.h"
 #include "utils/elog.h"
 
-
 #include "alloc.h"
 #include "config.h"
+#include "connection.h"
 #include "db.h"
+
+extern config_redis config;
 
 backend_pool* backends;
 req_queue* req_wait_plan;
-
 
 void free_db(void) {
     for (int i = 0 ; i < backends->count_backend; ++i ) {
@@ -17,11 +18,39 @@ void free_db(void) {
     }
 }
 
-void register_command() {
-    
+int register_command(req_to_db* new_req, db_connect* db_conn) {
+    if (pthread_mutex_lock(req_wait_plan->lock)) {
+        return -1;
+    }
+
+    if (req_wait_plan->first == NULL) {
+        req_wait_plan->first = req_wait_plan->last = wcalloc(sizeof(req_queue));
+    } else {
+        req_wait_plan->last->next = wcalloc(sizeof(req_queue));
+        req_wait_plan->last = req_wait_plan->last->next;
+    }
+    req_wait_plan->last = new_req;
+    req_wait_plan->last->next = NULL;
+    req_wait_plan->queue_size++;
+
+    if (pthread_cond_signal(req_wait_plan->cond_has_requests)) {
+        return -1;
+    }
+
+    if (pthread_mutex_unlock(req_wait_plan->lock)) {
+        return -1;
+    }
+
+    db_conn->finish_read = false;
+    if (pipe(db_conn->pipe_to_db) == -1) {
+        return -1;
+    }
+
+    return db_conn->pipe_to_db[1];
 }
 
-void init_db(db_conn_conf* conf) {
+void init_db(void) {
+    db_conn_conf* conf = &config.db_conf;
     req_wait_plan = wcalloc(sizeof(req_queue));
     req_wait_plan->first = req_wait_plan->last = NULL;
 
@@ -59,16 +88,28 @@ void init_db(db_conn_conf* conf) {
 
         backends->connection[i]->status = FREE;
     }
+
+    if (pthread_mutex_init(req_wait_plan->lock, NULL) != 0) {
+        free_db();
+        ereport(ERROR, errmsg("init_db: pthread_mutex_init() failed"));
+        abort();
+    }
+
+    if (pthread_cond_init(req_wait_plan->cond_has_requests, NULL)) {
+        free_db();
+        ereport(ERROR, errmsg("init_db: pthread_cond_init() failed"));
+        abort();
+    }
+    req_wait_plan->queue_size = 0;
 }
 
-void* start_db_worker(void* argv) {
-    db_conn_conf* conf = (db_conn_conf*)argv;
-    init_db(conf);
+void* start_db_worker(void) {
+    init_db();
 }
 
-pthread_t init_db_worker(db_conn_conf* conf) {
+pthread_t init_db_worker(void) {
     pthread_t db_tid;
-    int err = pthread_create(&(db_tid), NULL, start_db_worker, conf);
+    int err = pthread_create(&(db_tid), NULL, start_db_worker, NULL);
     if (err) {
         ereport(ERROR, errmsg("init_worker: pthread_create error %s", strerror(err)));
         abort();

@@ -7,6 +7,7 @@ typedef struct cache_conf cache_conf;
 typedef struct config_redis config_redis;
 typedef struct db_conn_conf db_conn_conf;
 typedef struct init_worker_conf init_worker_conf;
+typedef struct proto_conf proto_conf;
 
 void init_config(config_redis* config);
 
@@ -39,10 +40,15 @@ struct db_conn_conf {
     char* user;
 };
 
+struct proto_conf {
+    char delim;
+};
+
 struct config_redis {
     init_worker_conf worker_conf;
     cache_conf c_conf;
     db_conn_conf db_conf;
+    proto_conf p_conf;
 };
 
 #endif

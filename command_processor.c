@@ -11,8 +11,10 @@
 #include "connection.h"
 #include "db.h"
 #include "hash.h"
+#include "pg_req_creater.h"
 #include "resp_creater.h"
 
+extern config_redis config;
 command_dict* com_dict;
 
 // This is a dictionary that establishes a correspondence between a command name
@@ -23,8 +25,42 @@ redis_command commands[] = {
     {"set", do_set},
 };
 
+void free_pg_data(void* ptr) {
+    pg_data* data = (pg_data*)ptr;
+    tuple_list* list = data->tuples;
+    free(list);
+    free(data);
+}
+
+char** create_tuple(char* value, int value_size) {
+    char** tuple;
+    int count_attr = 1;
+    int cur_count_attr;
+    int start_pos;
+    for (int i = 0; i < value_size; ++i) {
+        if (value[i] == config.p_conf.delim) {
+            count_attr++;
+        }
+    }
+
+    tuple = wcalloc(count_attr * sizeof(char*));
+
+    start_pos = 0;
+    cur_count_attr = 0;
+    for (int cur_pos = 0; cur_pos < value_size; ++cur_pos) {
+        if (value[cur_pos] == config.p_conf.delim) {
+            int attr_size = cur_pos - start_pos;
+            tuple[cur_count_attr] = wcalloc((attr_size + 1) * sizeof(char));
+            memcpy(tuple[cur_count_attr], value + start_pos, attr_size);
+            tuple[cur_count_attr][attr_size] = '\0';
+            cur_count_attr++;
+        }
+    }
+    return tuple;
+}
+
 process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
-    answer* res;
+    pg_data* res;
     if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");
         return PROCESS_ERR;
@@ -33,21 +69,63 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
     res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
 
     if (res == NULL) {
-        register_command();
+        int notify_fd = register_command(create_pg_get(req), db_conn);
+        if (notify_fd == -1) {
+            return PROCESS_ERR;
+        }
+
+        subscribe(req->argv[1], req->argv_size[1], WAIT_DATA, notify_fd);
         return DB_REQ;
     }
 
-    answ->answer = wcalloc(res->answer_size * sizeof(char));
-    memcpy(answ->answer, res->answer, res->answer_size);
+    
+    create_resp_array(answ, res->count_tuples, );
 
     if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");
-        return -1;
+        return PROCESS_ERR;
     }
 }
 
 process_result do_set(client_req* req, answer* answ) {
+    pg_data* res;
+    int err = 0;
+    if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
+        create_err_resp(answ, "ERR syntax error");
+        return PROCESS_ERR;
+    }
 
+    res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
+    if (res == NULL) {
+        res = wcalloc(sizeof(pg_data));
+        res->count_tuples = 0;
+        res->tuples = wcalloc(sizeof(tuple_list));
+        res->tuples->first = res->tuples->last = wcalloc(sizeof(tuple));
+    } else {
+        res->tuples->last->next = wcalloc(sizeof(tuple));
+        res->tuples->last = res->tuples->last->next;
+    }
+    res->count_tuples++;
+    res->tuples->last->next = NULL;
+    res->tuples->last->argv = create_tuple(req->argv[2], req->argv_size[2]);
+
+    err = set_cache(create_data(req->argv[1], req->argv_size[1], res, free_pg_data));
+    if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
+        create_err_resp(answ, "ERR syntax error");
+        return PROCESS_ERR;
+    }
+
+    if (err != 0 ) {
+        return PROCESS_ERR;
+    }
+
+    if (config.c_conf.mode == NO_SYNC) {
+        return DONE;
+    } else if (config.c_conf.mode == ALL_SYNC) {
+        return DB_REQ;
+    } else {
+        return PROCESS_ERR;
+    }
 }
 
 process_result do_del(client_req* req, answer* answ) {

@@ -68,7 +68,6 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
 
 void* get_cache(cache_data new_data) {
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
-    cache_get_result get_result;
 
     cache_data* data = find_data_in_basket(basket, new_data.key, new_data.key_size);
     if (data != NULL) {
@@ -78,15 +77,12 @@ void* get_cache(cache_data new_data) {
     return NULL;
 }
 
-int set_cache(cache_data new_data) {
+set_result set_cache(cache_data new_data) {
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
-
+    set_result res = SET_OLD;
     cache_data* data = basket->first;
     while (data != NULL) {
         if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
-            if (data->d_type != new_data.d_type) {
-                return -1;
-            }
             break;
         }
         data = data->next;
@@ -108,20 +104,17 @@ int set_cache(cache_data new_data) {
         memcpy(data->key, new_data.key, new_data.key_size);
         data->key_size = new_data.key_size;
         data->free_data = new_data.free_data;
+        res = SET_NEW;
     }
 
     data->last_time = time(NULL);
     if (data->last_time == -1) {
-        return -1;
-    }
-
-    if (data->data != NULL) {
-        data->free_data(data->data);
+        return SET_ERR;
     }
 
     data->data = new_data.data;
 
-    return 0;
+    return res;
 }
 
 int delete_cache(char* key, int key_size) {
@@ -130,8 +123,7 @@ int delete_cache(char* key, int key_size) {
     cache_data* data = basket->first;
     cache_data* prev_data = NULL;
     while (data != NULL) {
-        if (memcmp(data->key, key, key_size) == 0 &&
-            data->key_size == key_size) {
+        if (memcmp(data->key, key, key_size) == 0 && data->key_size == key_size) {
             break;
         }
         prev_data = data;
@@ -183,6 +175,7 @@ int unlock_cache_basket(char* key, int key_size) {
     if (err != 0) {
         return -1;
     }
+
     return 0;
 }
 
@@ -194,4 +187,24 @@ cache_data create_data(char* key, int key_size, void* data, void (*free_data)(vo
     new_data.free_data = free_data;
     new_data.data = data;
     return new_data;
+}
+
+int subscribe(char* key,int key_size, sub_reason reason, int notify_fd) {
+    cache_basket* basket = get_basket(key, key_size);
+
+    cache_data* data = find_data_in_basket(basket, key, key_size);
+    if (data != NULL) {
+        if (data->pend_list->first == NULL) {
+            data->pend_list->first = data->pend_list->last = wcalloc(sizeof(pending));
+        } else {
+            data->pend_list->last->next = wcalloc(sizeof(pending));
+            data->pend_list->last = data->pend_list->last->next;
+        }
+        data->pend_list->last->next = NULL;
+        data->pend_list->last->notify_fd = notify_fd;
+        data->pend_list->last->reason = reason;
+        return 0;
+    }
+
+    return -1;
 }

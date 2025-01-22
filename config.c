@@ -19,6 +19,8 @@ void defalt_setting_init(void) {
     config.db_conf.count_conneton = 4;
     config.db_conf.dbname = wcalloc(9 * sizeof(char));
     memcpy(config.db_conf.dbname, "postgres", 9);
+
+    config.p_conf.delim = '.';
 }
 
 // Initialize the config value from the corresponding file.
