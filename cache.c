@@ -57,8 +57,7 @@ cache_basket* get_basket(char* key, int key_size) {
 cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     cache_data* data = basket->first;
     while (data != NULL) {
-        if (memcmp(data->key, key, key_size) == 0 &&
-            data->key_size == key_size) {
+        if (memcmp(data->key, key, key_size) == 0 && data->key_size == key_size) {
             return data;
         }
         data = data->next;
@@ -77,9 +76,8 @@ void* get_cache(cache_data new_data) {
     return NULL;
 }
 
-set_result set_cache(cache_data new_data) {
+int set_cache(cache_data new_data) {
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
-    set_result res = SET_OLD;
     cache_data* data = basket->first;
     while (data != NULL) {
         if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
@@ -104,17 +102,16 @@ set_result set_cache(cache_data new_data) {
         memcpy(data->key, new_data.key, new_data.key_size);
         data->key_size = new_data.key_size;
         data->free_data = new_data.free_data;
-        res = SET_NEW;
     }
 
     data->last_time = time(NULL);
     if (data->last_time == -1) {
-        return SET_ERR;
+        return -1;
     }
 
     data->data = new_data.data;
 
-    return res;
+    return 1;
 }
 
 int delete_cache(char* key, int key_size) {
@@ -189,7 +186,7 @@ cache_data create_data(char* key, int key_size, void* data, void (*free_data)(vo
     return new_data;
 }
 
-int subscribe(char* key,int key_size, sub_reason reason, int notify_fd) {
+int subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
     cache_basket* basket = get_basket(key, key_size);
 
     cache_data* data = find_data_in_basket(basket, key, key_size);
@@ -205,6 +202,5 @@ int subscribe(char* key,int key_size, sub_reason reason, int notify_fd) {
         data->pend_list->last->reason = reason;
         return 0;
     }
-
     return -1;
 }

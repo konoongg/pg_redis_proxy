@@ -20,11 +20,13 @@ typedef struct resp_array_arg resp_array_arg;
 typedef struct resp_int_arg resp_int_arg;
 typedef union generic_resp_arg generic_resp_arg;
 
-int create_array_resp(answer* answ, int count_elem, resp_type* elem_types);
-int create_bulk_string_resp(answer* answ, char* src, int size);
-int create_err_resp(answer* answ, char* src);
-int create_num_resp(answer* answ, int num);
-int create_simple_string_resp(answer* answ, char* src);
+int get_array_size(answer* answ);
+void create_array_bulk_string_resp(answer* answ, int count_attr, char** attr, int* size_attr);
+void create_bulk_string_resp(answer* answ, char* src, int size);
+void create_err_resp(answer* answ, char* src);
+void create_num_resp(answer* answ, int num);
+void create_simple_string_resp(answer* answ, char* src);
+void init_array_by_elem(answer* answ, int count_elem, answer* elem);
 
 enum resp_type {
     INT,

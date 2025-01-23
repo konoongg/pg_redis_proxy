@@ -24,7 +24,7 @@ int delete_cache(char* key, int key_size);
 int init_cache(cache_conf* conf);
 int lock_cache_basket(char* key, int key_size);
 set_result set_cache(cache_data new_data);
-int subscribe(char* key,int key_size, sub_reason reason, int notify_fd);
+int subscribe(char* key, int key_size, sub_reason reason, int notify_fd);
 int unlock_cache_basket(char* key, int key_size);
 void free_cache(void);
 void* get_cache(cache_data new_data);

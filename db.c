@@ -49,6 +49,14 @@ int register_command(req_to_db* new_req, db_connect* db_conn) {
     return db_conn->pipe_to_db[1];
 }
 
+void req_queue_next() {
+    req_to_db* next_req = req_wait_plan->first->next;
+    free(req_wait_plan->first->req);
+    free(req_wait_plan->first);
+    req_wait_plan->first = next_req;
+    req_wait_plan->queue_size--;
+}
+
 void init_db(void) {
     db_conn_conf* conf = &config.db_conf;
     req_wait_plan = wcalloc(sizeof(req_queue));
@@ -66,7 +74,7 @@ void init_db(void) {
 
     for (int i = 0; i < backends->count_backend; ++i) {
         backends->connection[i] = wcalloc(sizeof(backend_connection));
-        backends->connection[i]->conn = PQconnectStart(conn_info);
+        backends->connection[i]->conn = PQconnectdb(conn_info);
         if (backends->connection[i]->conn  == NULL) {
             free_db();
             ereport(ERROR, errmsg("init_db: PQconnectStart error"));
@@ -105,6 +113,30 @@ void init_db(void) {
 
 void* start_db_worker(void) {
     init_db();
+    PGresult* res = NULL;
+    while(true) {
+
+        if (pthread_mutex_lock(req_wait_plan->lock) != 0) {
+            abort();
+        }
+
+        while (req_wait_plan->queue_size == 0) {
+            if (pthread_cond_wait(req_wait_plan->cond_has_requests, req_wait_plan->lock) != 0) {
+                abort();
+            }
+        }
+
+        res = PQexec(backends->connection[0], req_wait_plan->first->req);
+
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            abort();
+        }
+        req_queue_next();
+
+        if (pthread_mutex_unlock(req_wait_plan->lock) != 0) {
+            abort();
+        }
+    }
 }
 
 pthread_t init_db_worker(void) {

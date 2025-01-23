@@ -17,7 +17,7 @@ typedef struct tuple tuple;
 typedef struct tuple_list tuple_list;
 typedef enum data_type data_type;
 
-process_result process_command(client_req* req, answer* answ);
+process_result process_command(client_req* req, answer* answ, db_connect* db_conn);
 
 struct redis_command {
     char* name;
@@ -43,28 +43,6 @@ enum process_result {
     DONE,
     PROCESS_ERR,
     DB_REQ,
-};
-
-struct tuple {
-    char** argv;
-    tuple* next;
-};
-
-enum data_type {
-    PG_STRING,
-    PG_NUM,
-};
-
-struct tuple_list {
-    tuple* first;
-    tuple* last;
-    int count_argv;
-    data_type* argv_types;
-};
-
-struct pg_data {
-    tuple_list* tuples;
-    int count_tuples;
 };
 
 #endif
