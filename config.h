@@ -9,7 +9,7 @@ typedef struct db_conn_conf db_conn_conf;
 typedef struct init_worker_conf init_worker_conf;
 typedef struct proto_conf proto_conf;
 
-void init_config(config_redis* config);
+void init_config(void);
 
 struct init_worker_conf {
     int backlog_size;

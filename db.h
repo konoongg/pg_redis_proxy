@@ -6,19 +6,27 @@
 #include <pthread.h>
 
 #include "libpq-fe.h"
+#include "cache.h"
 
 typedef enum backend_status backend_status;
+typedef enum result_db result_db;
+typedef enum set_result set_result;
 typedef struct backend_connection backend_connection;
 typedef struct backend_pool backend_pool;
-typedef struct req_to_db req_to_db;
 typedef struct req_queue req_queue;
+typedef struct req_to_db req_to_db;
 
 int register_command(req_to_db* new_req, db_connect* db_conn);
+pthread_t init_db_worker(void);
 
 struct req_to_db {
     req_to_db* next;
+    sub_reason reason;
     char* req;
     int size_req;
+    void* data;
+    char* key;
+    int key_size;
 };
 
 struct req_queue {
@@ -43,6 +51,11 @@ struct backend_connection {
 struct backend_pool {
     backend_connection** connection;
     int count_backend;
+};
+
+enum result_db {
+    CONN_DB_ERR = -1,
+    CONN_DB_OK,
 };
 
 #endif

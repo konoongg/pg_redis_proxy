@@ -13,6 +13,7 @@ typedef struct socket_parsing socket_parsing;
 typedef struct socket_read_data socket_read_data;
 typedef struct socket_write_data socket_write_data;
 typedef struct tuple tuple;
+
 // parsers status
 enum read_status {
     ARRAY_WAIT,

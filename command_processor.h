@@ -17,16 +17,19 @@ typedef struct tuple tuple;
 typedef struct tuple_list tuple_list;
 typedef enum data_type data_type;
 
+int init_commands(void);
 process_result process_command(client_req* req, answer* answ, db_connect* db_conn);
+void free_resp_answ(void* ptr);
+void process_err(answer* answ, char* err);
 
 struct redis_command {
     char* name;
-    int (*func)(client_req* req, answer* answ, db_connect* db_conn);
+    process_result (*func)(client_req* req, answer* answ, db_connect* db_conn);
 };
 
 struct command_dict {
     entris** commands;
-    process_result (*hash_func)(char* key);
+    int (*hash_func)(char* key);
 };
 
 struct command_entry {

@@ -2,10 +2,12 @@
 #define _GNU_SOURCE
 #endif
 
+#include <errno.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
 
 #include "postgres.h"
 #include "utils/elog.h"
@@ -17,13 +19,16 @@
 #include "hash.h"
 #include "strings.h"
 
+cache_basket* get_basket(char* key, int key_size);
 cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size);
 void free_storage(kv_storage storage);
 
 cache* c;
+extern config_redis config;
 
-int init_cache(cache_conf* conf) {
+int init_cache() {
     kv_storage* storage;
+    cache_conf* conf = &config.c_conf;
     int count_basket = conf->count_basket;
 
     c = wcalloc(sizeof(cache));
@@ -111,7 +116,7 @@ int set_cache(cache_data new_data) {
 
     data->data = new_data.data;
 
-    return 1;
+    return 0;
 }
 
 int delete_cache(char* key, int key_size) {
@@ -145,7 +150,7 @@ void free_cache(void) {
         cache_data* cur_data = basket->first;
         while (cur_data != NULL) {
             cache_data* new_data = cur_data->next;
-            free_cache_data(cur_data->key, cur_data->key_size);
+            cur_data->free_data(cur_data->data);
             cur_data = new_data;
         }
     }
@@ -199,8 +204,24 @@ int subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
         }
         data->pend_list->last->next = NULL;
         data->pend_list->last->notify_fd = notify_fd;
-        data->pend_list->last->reason = reason;
         return 0;
     }
     return -1;
+}
+
+void notify(char* key, int key_size, char mes) {
+    cache_basket* basket = get_basket(key, key_size);
+    cache_data* data = find_data_in_basket(basket, key, key_size);
+
+    if (data != NULL) {
+        pending* cur_pend = data->pend_list->first;
+        while (cur_pend != NULL) {
+            pending* next_pend = cur_pend->next;
+            if (write(cur_pend->notify_fd, &mes, 1 ) != 1) {
+                abort();
+            }
+            free(cur_pend);
+            cur_pend = next_pend;
+        }
+    }
 }

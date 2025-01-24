@@ -1,3 +1,7 @@
+#include <stdlib.h>
+#include <string.h>
+
+#include "alloc.h"
 #include "cache.h"
 #include "config.h"
 #include "connection.h"
@@ -5,6 +9,12 @@
 #include "pg_req_creater.h"
 
 extern config_redis config;
+
+void init_attribute(table_attribute* attr, char* key, int key_size);
+void free_attr(table_attribute* attr);
+char* create_columns_name(tuple* new_tuple, int* returned_size);
+char* create_columns_value(tuple* new_tuple, int* returned_size);
+char* create_set_values(tuple* new_tuple, int* returned_size);
 
 void init_attribute(table_attribute* attr, char* key, int key_size) {
     int start_index = 0;
@@ -24,9 +34,9 @@ void init_attribute(table_attribute* attr, char* key, int key_size) {
                 int value_size = key_size - cur_index;
 
                 attr->column = wcalloc((column_size + 1) * sizeof(char));
-                attr->column [column_size] = '\0';
+                attr->column[column_size] = '\0';
                 attr->value = wcalloc((value_size + 1) * sizeof(char));
-                attr->value [value_size] = '\0';
+                attr->value[value_size] = '\0';
                 attr->column_size = column_size;
                 attr->value_size = value_size;
                 memcpy(attr->column, key  + start_index, cur_index - start_index);
@@ -45,32 +55,39 @@ void free_attr(table_attribute* attr) {
 }
 
 req_to_db* create_pg_get(client_req* req) {
-    table_attribute* attr = wcalloc(sizeof(table_attribute));
-    char* req;
+    char* req_mes;
     int size_req;
+    req_to_db* new_req;
+    table_attribute* attr = wcalloc(sizeof(table_attribute));
+
     init_attribute(attr, req->argv[1], req->argv_size[1]);
     size_req = SELECT_BASE_SIZE + attr->column_size + attr->table_size + attr->value_size + 1; // \0(+1)
 
-    req = wcalloc(size_req * sizeof(char));
-    snprintf(req, size_req, "SELECT * FROM %s WHERE %s = %s;", attr->table, attr->column, attr->value);
+    req_mes = wcalloc(size_req * sizeof(char));
+    snprintf(req_mes, size_req, "SELECT * FROM %s WHERE %s = %s;", attr->table, attr->column, attr->value);
     free_attr(attr);
 
-    req_to_db* new_req = wcalloc(sizeof(req_to_db));
+    new_req = wcalloc(sizeof(req_to_db));
     new_req->next = NULL;
-    new_req->req = req;
+    new_req->req = req_mes;
+    new_req->reason = WAIT_DATA;
+    new_req->key = req->argv[1];
+    new_req->key_size = req->argv_size[1];
     new_req->size_req = size_req;
     return new_req;
 }
 
 char* create_columns_name(tuple* new_tuple, int* returned_size) {
+    int columns_name_index = 0;
     int columns_name_size = new_tuple->count_attr - 1; // attr1<,>attr2
+    int cur_attr = 0;
+
+    char* columns_name = wcalloc(columns_name_size * sizeof(char));
+
     for (int i = 0; i < new_tuple->count_attr; ++i) {
         columns_name_size += new_tuple->attr_name_size[i];
     }
 
-    char* columns_name = wcalloc(columns_name_size * sizeof(char));
-    int columns_name_index = 0;
-    int cur_attr = 0;
     memcpy(columns_name, new_tuple->attr_name[cur_attr], new_tuple->attr_name_size[cur_attr]);
     cur_attr++;
     columns_name_index +=new_tuple->attr_name_size[cur_attr];
@@ -89,14 +106,16 @@ char* create_columns_name(tuple* new_tuple, int* returned_size) {
 }
 
 char* create_columns_value(tuple* new_tuple, int* returned_size) {
+    int columns_value_index = 0;
     int columns_value_size = new_tuple->count_attr - 1; // attr1<,>attr2
+    int cur_attr = 0;
+
+    char* columns_value = wcalloc(columns_value_size * sizeof(char));
+
     for (int i = 0; i < new_tuple->count_attr; ++i) {
         columns_value_size += new_tuple->attr_size[i];
     }
 
-    char* columns_value = wcalloc(columns_value_size * sizeof(char));
-    int columns_value_index = 0;
-    int cur_attr = 0;
     memcpy(columns_value, new_tuple->attr[cur_attr], new_tuple->attr_size[cur_attr]);
     cur_attr++;
     columns_value_index += new_tuple->attr_name_size[cur_attr];
@@ -115,13 +134,16 @@ char* create_columns_value(tuple* new_tuple, int* returned_size) {
 }
 
 char* create_set_values(tuple* new_tuple, int* returned_size) {
+    char* set_values;
+    int cur_attr = 0;
+    int set_values_index = 0;
     int set_values_size = new_tuple->count_attr - 1; // attr1<,>attr2
+
     for (int i = 0; i < new_tuple->count_attr; ++i) {
         set_values_size += new_tuple->attr_size[i] + new_tuple->attr_name_size[i] + 1; // <name>=<value>
     }
-    char* set_values = wcalloc(set_values_size * sizeof(char));
-    int set_values_index = 0;
-    int cur_attr = 0;
+    set_values = wcalloc(set_values_size * sizeof(char));
+
     memcpy(set_values, new_tuple->attr_name[cur_attr], new_tuple->attr_name_size[cur_attr]);
     set_values_index += new_tuple->attr_name_size[cur_attr];
     set_values[set_values_index] = '=';
@@ -149,26 +171,31 @@ char* create_set_values(tuple* new_tuple, int* returned_size) {
 }
 
 req_to_db* create_pg_set(client_req* req, tuple* new_tuple) {
-    table_attribute* attr = wcalloc(sizeof(table_attribute));
-    char* req;
-    int size_req = SET_BASE_SIZE;
-    init_attribute(attr, req->argv[1], req->argv_size[1]);
-
+    char* req_mes;
     int columns_name_size;
     int columns_value_size;
     int set_velues_size;
+    int size_req = SET_BASE_SIZE;
+    req_to_db* new_req = wcalloc(sizeof(req_to_db));
+    table_attribute* attr = wcalloc(sizeof(table_attribute));
 
+    char* set_values = create_set_values(new_tuple, &set_velues_size);
     char* columns_name = create_columns_name(new_tuple, &columns_name_size);
     char* columns_value = create_columns_name(new_tuple, &columns_value_size);
-    char* set_values = create_set_values(new_tuple, &set_velues_size);
+
+    init_attribute(attr, req->argv[1], req->argv_size[1]);
+
     size_req += 2 * columns_name_size + columns_value_size + set_velues_size;
-    req = wcalloc(size_req * sizeof(char));
-    snprintf(req, size_req, "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s;",
+    req_mes = wcalloc(size_req * sizeof(char));
+    snprintf(req_mes, size_req, "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s;",
                                         attr->table, columns_name, columns_value, columns_name, set_values);
 
-    req_to_db* new_req = wcalloc(sizeof(req_to_db));
+
     new_req->next = NULL;
-    new_req->req = req;
+    new_req->reason = WAIT_SYNC;
+    new_req->req = req_mes;
+    new_req->key = req->argv[1];
+    new_req->key_size = req->argv_size[1];
     new_req->size_req = size_req;
     free_attr(attr);
     free(columns_name);
@@ -178,35 +205,38 @@ req_to_db* create_pg_set(client_req* req, tuple* new_tuple) {
 }
 
 req_to_db* create_pg_del(client_req* req) {
-    table_attribute* attr = wcalloc(sizeof(table_attribute));
-    char* req;
+    char* req_mes;
+    int del_cond_index = 0;
     int size_req = TRANSACTION_SIZE;
+    req_to_db* new_req = wcalloc(sizeof(req_to_db));
+    table_attribute* attr = wcalloc(sizeof(table_attribute));
 
     for (int i = 1; i < req->argc; ++i)  {
         size_req += req->argv_size[i] + 4 + DELETE_BASE_SIZE;
     }
-    req = wcalloc(size_req * sizeof(char));
-    int del_cond_index = 0;
-    memcpy(req + del_cond_index, "begin;", 6);
+    req_mes = wcalloc(size_req * sizeof(char));
+    memcpy(req_mes + del_cond_index, "begin;", 6);
     del_cond_index += 6;
     for (int i = 1; i < req->argc; ++i) {
         char* del_req;
         int size_del_req = 0;
+
         init_attribute(attr, req->argv[i], req->argv_size[i]);
         size_del_req = DELETE_BASE_SIZE + attr->table_size + attr->column_size + attr->value_size;
         del_req = wcalloc(size_del_req * sizeof(char));
 
-        snprintf(del_req, size_req, "DELETE FROM %s WHERE %s=%s;", attr->table, attr->column_size, attr->value);
-        memcpy(req + del_cond_index, del_req, size_del_req);
+        snprintf(del_req, size_req, "DELETE FROM %s WHERE %s=%s;", attr->table, attr->column, attr->value);
+        memcpy(req_mes + del_cond_index, del_req, size_del_req);
         del_cond_index += size_del_req;
         free_attr(attr);
     }
-    memcpy(req + del_cond_index, "end;", 4);
+    memcpy(req_mes + del_cond_index, "end;", 4);
 
-
-    req_to_db* new_req = wcalloc(sizeof(req_to_db));
     new_req->next = NULL;
-    new_req->req = req;
+    new_req->req = req_mes;
+    new_req->key = req->argv[1];
+    new_req->key_size = req->argv_size[1];
+    new_req->reason = WAIT_SYNC;
     new_req->size_req = size_req;
     return new_req;
 }

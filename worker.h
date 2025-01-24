@@ -3,6 +3,6 @@
 
 #include "config.h"
 
-int init_workers(init_worker_conf* conf);
+int init_workers();
 
 #endif

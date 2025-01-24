@@ -15,6 +15,7 @@ typedef struct table_attribute  table_attribute;
 
 req_to_db* create_pg_get(client_req* req);
 req_to_db* create_pg_set(client_req* req, tuple* new_tuple);
+req_to_db* create_pg_del(client_req* req);
 
 enum attr_parser {
     TABLE,

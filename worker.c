@@ -15,6 +15,7 @@
 #include "config.h"
 #include "connection.h"
 #include "data_parser.h"
+#include "db.h"
 #include "socket_wrapper.h"
 #include "worker.h"
 
@@ -40,9 +41,13 @@
         req = NULL; \
     }
 
+int init_workers(void);
 void close_connection(EV_P_ struct ev_io* io_handle);
+void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
 void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
+void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents);
 void on_write_cb(EV_P_ struct ev_io* io_handle, int revents);
+void process_req(EV_P_ socket_data* data);
 void* start_worker(void* argv);
 
 extern config_redis config;
@@ -61,7 +66,7 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
         cur_req = req;
     }
 
-    cur_answer = data->write_data->answers;
+    cur_answer = data->write_data->answers->last;
     while(cur_answer != NULL) {
         answer* next_answer = cur_answer->next;
         free_answer(cur_answer);
@@ -70,6 +75,7 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
 
     ev_io_stop(loop, data->write_io_handle);
     ev_io_stop(loop, data->read_io_handle);
+    ev_io_stop(loop, data->read_db_handle);
 
     free(data->read_data->reqs);
     free(data->read_data->parsing.parsing_str);
@@ -85,7 +91,7 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
 void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
     socket_data* data = (socket_data*)io_handle->data;
     socket_write_data* w_data = data->write_data;
-    answer* cur_answer = w_data->answers;
+    answer* cur_answer = w_data->answers->first;
 
     if (revents & EV_ERROR) {
         close_connection(loop, io_handle);
@@ -98,7 +104,7 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
             answer* next_answer = cur_answer->next;
             free_answer(cur_answer);
             cur_answer = next_answer;
-            w_data->answers = cur_answer;
+            w_data->answers->last = cur_answer;
         } else if (res == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return;
@@ -117,12 +123,37 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
 }
 
 void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents) {
+    socket_data* data = io_handle->data;
+    socket_write_data* w_data = data->write_data;
+    socket_read_data* r_data = data->read_data;
+
+    answer* cur_answer;
+    client_req* cur_req = r_data->reqs->first;
+    int res;
+    result_db status;
 
     if (revents & EV_ERROR) {
         close_connection(loop, io_handle);
         abort();
     }
 
+
+    res = read(io_handle->fd, &status, 1);
+
+    if (res != 1) {
+        abort();
+    }
+
+    ev_io_stop(loop, io_handle);
+    if (status == CONN_DB_OK) {
+        //
+    } else if (status == CONN_DB_ERR) {
+        cur_answer = w_data->answers->last;
+        process_err(cur_answer, "ERR");
+    }
+    free_req(cur_req);
+    r_data->reqs->first = r_data->reqs->first->next;
+    process_req(loop, data);
 }
 
 void process_req(EV_P_ socket_data* data) {
@@ -132,6 +163,8 @@ void process_req(EV_P_ socket_data* data) {
     answer* cur_answer;
 
     while (true) {
+        process_result res;
+
         cur_req = r_data->reqs->first;
         if (cur_req == NULL) {
             ev_io_start(loop, data->write_io_handle);
@@ -144,9 +177,11 @@ void process_req(EV_P_ socket_data* data) {
             w_data->answers->last = w_data->answers->last->next;
         }
 
-        process_result res = process_command(cur_req, cur_answer);
+        cur_answer = w_data->answers->last;
+        res = process_command(cur_req, cur_answer, data->db_conn);
         if (res == DONE) {
-            ev_io_start(loop, data->read_db_handle);
+            free_req(cur_req);
+            r_data->reqs->first = r_data->reqs->first->next;
         } else if (res == DB_REQ) {
             ev_io_start(loop, data->read_db_handle);
         } else if  (res == PROCESS_ERR) {
@@ -154,8 +189,6 @@ void process_req(EV_P_ socket_data* data) {
         }
 
         cur_answer = w_data->answers->last;
-        free_req(cur_req);
-        r_data->reqs->first = r_data->reqs->first->next;
     }
 }
 
@@ -169,7 +202,6 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
     int res;
     socket_data* data = (socket_data*)io_handle->data;
     socket_read_data* r_data = data->read_data;
-    socket_write_data* w_data = data->write_data;
 
     if (revents & EV_ERROR) {
         close_connection(loop, io_handle);
@@ -238,6 +270,7 @@ void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     reqs->count_req = 0;
 
     data->read_db_handle = read_db_handle;
+    data->db_conn = wcalloc(sizeof(db_connect));
 
     data->write_data = w_data;
     data->write_data->answers = wcalloc(sizeof(answer_list));

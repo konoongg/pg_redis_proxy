@@ -9,7 +9,7 @@
 #include "cache.h"
 #include "command_processor.h"
 #include "config.h"
-#include "multiplexer.h"
+#include "db.h"
 #include "socket_wrapper.h"
 #include "worker.h"
 
@@ -40,19 +40,20 @@ static void register_proxy(void) {
 
 void proxy_start_work(Datum main_arg) {
     ereport(INFO, errmsg("start bg worker pg_redis_proxy"));
-    config = (config_redis*) wcalloc(sizeof(config_redis));
-    init_config(config);
+    init_config();
     if (init_commands() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));
         abort();
     }
     ereport(INFO, errmsg("finish init commands"));
-    if (init_cache(&config->c_conf) != 0) {
+    if (init_cache() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_cache"));
         abort();
     }
     ereport(INFO, errmsg("finish init cache"));
-    if (init_workers(&config->worker_conf) != 0) {
+    init_db_worker();
+    ereport(INFO, errmsg("finish init db worker"));
+    if (init_workers() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_workers"));
         abort();
     }

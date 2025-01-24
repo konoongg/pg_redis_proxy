@@ -142,16 +142,49 @@ void init_array_by_elem(answer* answ, int count_elem, answer* elem) {
     }
 }
 
+void init_array_by_elems(answer* answ, int count_elems, answer** elems) {
+    int answer_size;
+    int index = 0;
+    char str_size[MAX_STR_NUM_SIZE];
+
+    snprintf(str_size, MAX_STR_NUM_SIZE, "%d", count_elems); // *<integer>\r\n
+
+    answer_size = 1  + strlen(str_size) + 2;
+
+    for (int i = 0; i < count_elems; ++i) {
+        answer_size += elems[i]->answer_size;
+    }
+
+    answ->answer_size = answer_size;
+    answ->answer = wcalloc(answer_size * sizeof(char));
+
+    answ->answer[index] = '*';
+    index++;
+    memcpy(answ->answer + index, str_size, strlen(str_size));
+    index += strlen(str_size);
+    memcpy(answ->answer + index, crlf, 2);
+    index += 2;
+
+    for (int i = 0; i < count_elems; ++i) {
+        memcpy(answ->answer + index, elems[i]->answer, elems[i]->answer_size);
+        index += elems[i]->answer_size;
+    }
+}
+
 int get_array_size(answer* answ) {
+    char *endptr;
+    int count_len_array ;
+
     if (answ->answer[0] != '*') {
         return -1;
     }
 
-    char *endptr;
-    int count_len_array =  strtol(answ->answer + 1, &endptr, 10);
+
+    count_len_array =  strtol(answ->answer + 1, &endptr, 10);
 
     if (errno != 0 || *endptr != '\r') {
         return -1;
     }
+
     return count_len_array;
 }

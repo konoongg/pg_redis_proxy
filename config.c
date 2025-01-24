@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "alloc.h"
 #include "config.h"
 
@@ -13,12 +15,14 @@ void defalt_setting_init(void) {
 
     config.worker_conf.backlog_size = 512;
     config.worker_conf.buffer_size = 512;
-    config.worker_conf.count_worker = 4;
+    config.worker_conf.count_worker = 1;
     config.worker_conf.listen_port = 6379;
 
     config.db_conf.count_conneton = 4;
     config.db_conf.dbname = wcalloc(9 * sizeof(char));
+    config.db_conf.user = wcalloc(9 * sizeof(char));
     memcpy(config.db_conf.dbname, "postgres", 9);
+    memcpy(config.db_conf.user, "postgres", 9);
 
     config.p_conf.delim = '.';
 }

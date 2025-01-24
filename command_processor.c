@@ -17,6 +17,12 @@
 extern config_redis config;
 command_dict* com_dict;
 
+process_result do_del(client_req* req, answer* answ, db_connect* db_conn);
+process_result do_get(client_req* req, answer* answ, db_connect* db_conn);
+process_result do_set(client_req* req, answer* answ, db_connect* db_conn);
+tuple* create_tuple(char* value, int value_size);
+void free_tuple(tuple* tpl);
+
 // This is a dictionary that establishes a correspondence between a command name
 // and the function that should be called as a callback when that command is received.
 redis_command commands[] = {
@@ -33,9 +39,10 @@ void free_resp_answ(void* ptr) {
 
 tuple* create_tuple(char* value, int value_size) {
     tuple* new_tuple = wcalloc(sizeof(tuple));
-    new_tuple->count_attr = 1;
     int cur_count_attr;
     int start_pos;
+
+    new_tuple->count_attr = 1;
 
     for (int i = 0; i < value_size; ++i) {
         if (value[i] == config.p_conf.delim) {
@@ -51,9 +58,10 @@ tuple* create_tuple(char* value, int value_size) {
     for (int cur_pos = 0; cur_pos < value_size; ++cur_pos) {
         if (value[cur_pos] == config.p_conf.delim) {
             int attr_size = cur_pos - start_pos;
+            int index_delim;
+
             new_tuple->attr[cur_count_attr] = wcalloc(attr_size  * sizeof(char));
 
-            int index_delim;
             for (index_delim = start_pos; index_delim < cur_pos; ++index_delim) {
                 if (value[index_delim] == ':') {
                     break;
@@ -104,7 +112,6 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
             create_err_resp(answ, "ERR syntax error");
             return PROCESS_ERR;
         }
-
         return DB_REQ;
     }
 
@@ -116,6 +123,7 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
         create_err_resp(answ, "ERR syntax error");
         return PROCESS_ERR;
     }
+    return DONE;
 }
 
 process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
@@ -123,7 +131,7 @@ process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
     int set_res = 0;
 
     tuple* new_tuple = create_tuple(req->argv[2], req->argv_size[2]);
-    answer* new_array;
+    answer* new_array = wcalloc(sizeof(answer));
     create_array_bulk_string_resp(new_array, new_tuple->count_attr, new_tuple->attr, new_tuple->attr_size) ;
 
     if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
@@ -161,10 +169,11 @@ process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
         if (notify_fd == -1) {
             return PROCESS_ERR;
         }
-        subscribe(req->argv[1], req->argv_size[1], SET_DATA, notify_fd);
+        subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
         free_tuple(new_tuple);
         return DB_REQ;
     }
+    return DONE;
 }
 
 process_result do_del(client_req* req, answer* answ, db_connect* db_conn) {
@@ -193,6 +202,7 @@ process_result do_del(client_req* req, answer* answ, db_connect* db_conn) {
         subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
         return DB_REQ;
     }
+    return DONE;
 }
 
 void free_command(int hash);
@@ -253,4 +263,8 @@ process_result process_command(client_req* req, answer* answ, db_connect* db_con
         cur_command = cur_command->next;
     }
     return PROCESS_ERR;
+}
+
+void process_err(answer* answ, char* err) {
+    create_err_resp(answ, err);
 }
