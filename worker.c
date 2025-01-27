@@ -176,7 +176,6 @@ void process_req(EV_P_ socket_data* data) {
             w_data->answers->last->next = wcalloc(sizeof(answer));
             w_data->answers->last = w_data->answers->last->next;
         }
-
         cur_answer = w_data->answers->last;
         res = process_command(cur_req, cur_answer, data->db_conn);
         if (res == DONE) {

@@ -53,14 +53,16 @@ tuple* create_tuple(char* value, int value_size) {
     new_tuple->attr = wcalloc(new_tuple->count_attr * sizeof(char*));
     new_tuple->attr_size = wcalloc(new_tuple->count_attr * sizeof(int));
 
+    new_tuple->attr_name = wcalloc(new_tuple->count_attr * sizeof(char*));
+    new_tuple->attr_name_size = wcalloc(new_tuple->count_attr * sizeof(int));
+
     start_pos = 0;
     cur_count_attr = 0;
     for (int cur_pos = 0; cur_pos < value_size; ++cur_pos) {
         if (value[cur_pos] == config.p_conf.delim) {
-            int attr_size = cur_pos - start_pos;
             int index_delim;
-
-            new_tuple->attr[cur_count_attr] = wcalloc(attr_size  * sizeof(char));
+            int attr_name_size;
+            int attr_size;
 
             for (index_delim = start_pos; index_delim < cur_pos; ++index_delim) {
                 if (value[index_delim] == ':') {
@@ -68,11 +70,16 @@ tuple* create_tuple(char* value, int value_size) {
                 }
             }
 
+            attr_name_size = index_delim - start_pos;
+            attr_size = cur_pos - index_delim - 1;
 
-            memcpy(new_tuple->attr_name[cur_count_attr], value + start_pos, index_delim - start_pos);
-            memcpy(new_tuple->attr[cur_count_attr], value + index_delim + 1, cur_pos - index_delim - 1);
-            new_tuple->attr_name_size[cur_count_attr] = index_delim - start_pos;
-            new_tuple->attr_size[cur_count_attr] = cur_pos - index_delim - 1;
+            new_tuple->attr[cur_count_attr] = wcalloc(attr_size  * sizeof(char));
+            new_tuple->attr_name[cur_count_attr] = wcalloc(attr_name_size  * sizeof(char));
+
+            memcpy(new_tuple->attr_name[cur_count_attr], value + start_pos, attr_name_size);
+            memcpy(new_tuple->attr[cur_count_attr], value + index_delim + 1, attr_size);
+            new_tuple->attr_name_size[cur_count_attr] = attr_name_size;
+            new_tuple->attr_size[cur_count_attr] = attr_size;
             cur_count_attr++;
         }
     }
@@ -81,7 +88,7 @@ tuple* create_tuple(char* value, int value_size) {
 
 void free_tuple(tuple* tpl) {
     free(tpl->attr_size);
-    free(tpl->attr_size);
+    free(tpl->attr_name_size);
     for (int i = 0; i < tpl->count_attr; ++i) {
         free(tpl->attr_name[i]);
         free(tpl->attr[i]);
@@ -127,31 +134,33 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
 }
 
 process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
-    answer* res = wcalloc(sizeof(answer));
-    int set_res = 0;
+    answer* cache_res;
+    answer* new_answer = wcalloc(sizeof(answer));
+    int  set_res = 0;
+    process_result proccess_res;
 
     tuple* new_tuple = create_tuple(req->argv[2], req->argv_size[2]);
-    answer* new_array = wcalloc(sizeof(answer));
-    create_array_bulk_string_resp(new_array, new_tuple->count_attr, new_tuple->attr, new_tuple->attr_size) ;
+
+    answer* new_resp_array = wcalloc(sizeof(answer));
+    create_array_bulk_string_resp(new_resp_array, new_tuple->count_attr, new_tuple->attr, new_tuple->attr_size) ;
 
     if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");
         return PROCESS_ERR;
     }
 
-    res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
+    cache_res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
 
-    if (res == NULL) {
-        init_array_by_elem(res, 1, new_array);
+    if (cache_res == NULL) {
+        init_array_by_elem(new_answer, 1, new_resp_array);
     } else {
-        int array_size = get_array_size(res);
-        if (array_size == -1) {
-            abort();
-        }
-        init_array_by_elem(res, array_size, new_array);
+        int array_size = get_array_size(cache_res);
+        init_array_by_elem(new_answer, array_size, new_resp_array);
     }
 
-    set_res = set_cache(create_data(req->argv[1], req->argv_size[1], res, free_resp_answ));
+    set_res = set_cache(create_data(req->argv[1], req->argv_size[1], new_answer, free_resp_answ));
+
+    create_simple_string_resp(answ, "OK");
 
     if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");
@@ -159,21 +168,22 @@ process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
     }
 
     if (set_res  == -1 ) {
-        return PROCESS_ERR;
+        abort();
     }
 
-    if (config.c_conf.mode == NO_SYNC) {
-        return DONE;
-    } else if (config.c_conf.mode == ALL_SYNC) {
+    if (config.c_conf.mode == NO_SYNC) {;
+        proccess_res = DONE;
+    } else {
         int notify_fd = register_command(create_pg_set(req, new_tuple), db_conn);
         if (notify_fd == -1) {
-            return PROCESS_ERR;
+            proccess_res = PROCESS_ERR;
         }
         subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
-        free_tuple(new_tuple);
-        return DB_REQ;
+        proccess_res = DB_REQ;
     }
-    return DONE;
+
+    free_tuple(new_tuple);
+    return proccess_res;
 }
 
 process_result do_del(client_req* req, answer* answ, db_connect* db_conn) {

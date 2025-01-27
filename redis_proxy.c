@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "postgres.h"
 #include "fmgr.h"
@@ -30,16 +31,17 @@ static void register_proxy(void) {
     BackgroundWorker worker;
     memset(&worker, 0, sizeof(BackgroundWorker));
     worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
-    worker.bgw_start_time = BgWorkerStart_PostmasterStart;
+    worker.bgw_start_time =  BgWorkerStart_RecoveryFinished;
     strncpy(worker.bgw_library_name, "pg_redis_proxy", 15);
     strncpy(worker.bgw_function_name, "proxy_start_work", 17);
     strncpy(worker.bgw_name, "pg_redis_proxy", 15);
     strncpy(worker.bgw_type, "redis proxy server", 19);
+    worker.bgw_restart_time = BGW_NEVER_RESTART;
     RegisterBackgroundWorker(&worker);
 }
 
 void proxy_start_work(Datum main_arg) {
-    ereport(INFO, errmsg("start bg worker pg_redis_proxy"));
+    ereport(INFO, errmsg("start bg worker pg_redis_proxy pid: %d", getpid()));
     init_config();
     if (init_commands() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_commands"));

@@ -95,6 +95,7 @@ void create_array_bulk_string_resp(answer* answ, int count_attr, char** attr, in
 
     answer_size = 1  + strlen(str_size) + 2;
     for (int i = 0; i < count_attr; ++i) {
+        sub_answers[i] = wcalloc(sizeof(answer));
         create_bulk_string_resp(sub_answers[i], attr[i], size_attr[i]);
         answer_size += sub_answers[i]->answer_size;
     }
@@ -174,11 +175,6 @@ void init_array_by_elems(answer* answ, int count_elems, answer** elems) {
 int get_array_size(answer* answ) {
     char *endptr;
     int count_len_array ;
-
-    if (answ->answer[0] != '*') {
-        return -1;
-    }
-
 
     count_len_array =  strtol(answ->answer + 1, &endptr, 10);
 

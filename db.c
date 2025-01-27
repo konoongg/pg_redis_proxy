@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <unistd.h>
 
 #include "postgres.h"
@@ -72,13 +73,16 @@ void init_db(void) {
     req_wait_plan = wcalloc(sizeof(req_queue));
     req_wait_plan->first = req_wait_plan->last = NULL;
 
-    backends = wcalloc(sizeof(backend_pool));
-    backends->count_backend = conf->count_conneton;
-    backends->connection = wcalloc(conf->count_conneton * sizeof(backend_connection*));
+    req_wait_plan->lock = wcalloc(sizeof(pthread_mutex_t));
+    req_wait_plan->cond_has_requests = wcalloc(sizeof(pthread_cond_t));
 
-    conn_info_size = CONN_INFO_DEFAULT_SIZE + strlen(conf->dbname) + strlen(conf->user);
+    backends = wcalloc(sizeof(backend_pool));
+    backends->count_backend = conf->count_connection;
+    backends->connection = wcalloc(conf->count_connection * sizeof(backend_connection*));
+
+    conn_info_size = CONN_INFO_DEFAULT_SIZE + strlen(conf->dbname) + strlen(getlogin());
     conn_info = wcalloc(conn_info_size * sizeof(char));
-    if (sprintf(conn_info, "user=%s dbname=%s", conf->user, conf->dbname) < 0) {
+    if (sprintf(conn_info, "user=%s dbname=%s host=localhost", getlogin(), conf->dbname) < 0) {
         ereport(INFO, errmsg("init_db: can't create connection info"));
         abort();
     }
@@ -86,6 +90,7 @@ void init_db(void) {
     for (int i = 0; i < backends->count_backend; ++i) {
         backends->connection[i] = wcalloc(sizeof(backend_connection));
         backends->connection[i]->conn = PQconnectdb(conn_info);
+
         if (backends->connection[i]->conn  == NULL) {
             ereport(INFO, errmsg("init_db: PQconnectStart error"));
             free_db();

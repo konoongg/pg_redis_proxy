@@ -26,7 +26,7 @@ void free_storage(kv_storage storage);
 cache* c;
 extern config_redis config;
 
-int init_cache() {
+int init_cache(void) {
     kv_storage* storage;
     cache_conf* conf = &config.c_conf;
     int count_basket = conf->count_basket;

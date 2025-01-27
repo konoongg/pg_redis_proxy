@@ -20,7 +20,7 @@ typedef struct pending_list pending_list;
 
 cache_data create_data(char* key, int key_size, void* data, void (*free_data)(void* data));
 int delete_cache(char* key, int key_size);
-int init_cache();
+int init_cache(void);
 int lock_cache_basket(char* key, int key_size);
 int set_cache(cache_data new_data);
 int subscribe(char* key, int key_size, sub_reason reason, int notify_fd);

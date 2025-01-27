@@ -1,3 +1,3 @@
-cd proto_tetsts
-go run proto_tests.go
+cd func_tetsts
+go run func_tests.go
 cd ../load_tests

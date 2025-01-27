@@ -1,7 +1,7 @@
 #ifndef DB_H
 #define DB_H
 
-#define CONN_INFO_DEFAULT_SIZE 13
+#define CONN_INFO_DEFAULT_SIZE 28
 
 #include <pthread.h>
 
