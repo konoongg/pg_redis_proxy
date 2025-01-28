@@ -38,6 +38,7 @@ void free_resp_answ(void* ptr) {
 }
 
 tuple* create_tuple(char* value, int value_size) {
+    ereport(INFO, errmsg("create_tuple: start"));
     tuple* new_tuple = wcalloc(sizeof(tuple));
     int cur_count_attr;
     int start_pos;
@@ -58,8 +59,8 @@ tuple* create_tuple(char* value, int value_size) {
 
     start_pos = 0;
     cur_count_attr = 0;
-    for (int cur_pos = 0; cur_pos < value_size; ++cur_pos) {
-        if (value[cur_pos] == config.p_conf.delim) {
+    for (int cur_pos = 0; cur_pos < value_size + 1; ++cur_pos) {
+        if (value[cur_pos] == config.p_conf.delim || value[cur_pos] == '\0') {
             int index_delim;
             int attr_name_size;
             int attr_size;
@@ -81,6 +82,7 @@ tuple* create_tuple(char* value, int value_size) {
             new_tuple->attr_name_size[cur_count_attr] = attr_name_size;
             new_tuple->attr_size[cur_count_attr] = attr_size;
             cur_count_attr++;
+            start_pos = cur_pos;
         }
     }
     return new_tuple;
@@ -99,6 +101,7 @@ void free_tuple(tuple* tpl) {
 }
 
 process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
+    ereport(INFO, errmsg("do_get: start %d ", req->argc));
     answer* res;
     if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");
@@ -108,12 +111,13 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
     res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
 
     if (res == NULL) {
-        int notify_fd = register_command(create_pg_get(req), db_conn);
+        int notify_fd = register_command(create_pg_get(req, answ), db_conn);
         if (notify_fd == -1) {
             return PROCESS_ERR;
         }
-
+        ereport(INFO, errmsg("do_get: start sub"));
         subscribe(req->argv[1], req->argv_size[1], WAIT_DATA, notify_fd);
+        ereport(INFO, errmsg("do_get: finish sub"));
 
         if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
             create_err_resp(answ, "ERR syntax error");
@@ -122,7 +126,7 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
         return DB_REQ;
     }
 
-
+    answ->answer = wcalloc(res->answer_size * sizeof(char));
     memcpy(answ->answer, res->answer, res->answer_size);
     answ->answer_size = res->answer_size;
 
@@ -134,6 +138,7 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
 }
 
 process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
+    ereport(INFO, errmsg("do_set: start %d ", req->argc));
     answer* cache_res;
     answer* new_answer = wcalloc(sizeof(answer));
     int  set_res = 0;
@@ -152,8 +157,11 @@ process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
     cache_res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
 
     if (cache_res == NULL) {
+
+        ereport(INFO, errmsg("do_set: cache_res == NULL"));
         init_array_by_elem(new_answer, 1, new_resp_array);
     } else {
+        ereport(INFO, errmsg("do_set: cache_res != NULL"));
         int array_size = get_array_size(cache_res);
         init_array_by_elem(new_answer, array_size, new_resp_array);
     }
@@ -187,32 +195,41 @@ process_result do_set(client_req* req, answer* answ, db_connect* db_conn) {
 }
 
 process_result do_del(client_req* req, answer* answ, db_connect* db_conn) {
-
+    int count_del = 0;
+    process_result process_res = NONE;
+    ereport(INFO, errmsg("do_del: start %d ", req->argc));
     for (int i = 1; i < req->argc; ++i) {
+
+        ereport(INFO, errmsg("do_del: try lock"));
         if (lock_cache_basket(req->argv[i], req->argv_size[i]) != 0) {
             create_err_resp(answ, "ERR syntax error");
             return PROCESS_ERR;
         }
 
-        delete_cache(req->argv[i], req->argv_size[i]);
+        ereport(INFO, errmsg("do_del: suc lock"));
+        count_del += delete_cache(req->argv[i], req->argv_size[i]);
 
         if (unlock_cache_basket(req->argv[i], req->argv_size[i]) != 0) {
             create_err_resp(answ, "ERR syntax error");
             return PROCESS_ERR;
         }
+        ereport(INFO, errmsg("do_del: unlock"));
     }
 
     if (config.c_conf.mode == NO_SYNC) {
-        return DONE;
+        process_res =  DONE;
     } else if (config.c_conf.mode == ALL_SYNC) {
         int notify_fd = register_command(create_pg_del(req), db_conn);
         if (notify_fd == -1) {
-            return PROCESS_ERR;
+            process_res =  PROCESS_ERR;
+        } else {
+            subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
+            process_res =  DB_REQ;
         }
-        subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
-        return DB_REQ;
     }
-    return DONE;
+    ereport(INFO, errmsg("do_del: count_del %d", count_del));
+    create_num_resp(answ, count_del);
+    return process_res;
 }
 
 void free_command(int hash);
@@ -263,6 +280,7 @@ int init_commands(void) {
 // This implementation allows for quickly
 // finding the function associated with a command in a short amount of time.
 process_result process_command(client_req* req, answer* answ, db_connect* db_conn) {
+    ereport(INFO, errmsg("process_command: start"));
     int hash = com_dict->hash_func(req->argv[0]);
     int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;

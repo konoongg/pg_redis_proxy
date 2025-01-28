@@ -23,11 +23,11 @@ int delete_cache(char* key, int key_size);
 int init_cache(void);
 int lock_cache_basket(char* key, int key_size);
 int set_cache(cache_data new_data);
-int subscribe(char* key, int key_size, sub_reason reason, int notify_fd);
 int unlock_cache_basket(char* key, int key_size);
 void free_cache(void);
-void* get_cache(cache_data new_data);
 void notify(char* key, int key_size, char mes);
+void subscribe(char* key, int key_size, sub_reason reason, int notify_fd);
+void* get_cache(cache_data new_data);
 
 struct pending {
     pending* next;

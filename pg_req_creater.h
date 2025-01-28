@@ -4,7 +4,7 @@
 #include "connection.h"
 #include "db.h"
 
-#define SELECT_BASE_SIZE 26
+#define SELECT_BASE_SIZE 28
 #define SET_BASE_SIZE 56
 #define DELETE_BASE_SIZE 21
 #define TRANSACTION_SIZE 12
@@ -13,7 +13,7 @@ typedef enum attr_parser attr_parser;
 typedef struct bd_value bd_value;
 typedef struct table_attribute  table_attribute;
 
-req_to_db* create_pg_get(client_req* req);
+req_to_db* create_pg_get(client_req* req, void* data);
 req_to_db* create_pg_set(client_req* req, tuple* new_tuple);
 req_to_db* create_pg_del(client_req* req);
 

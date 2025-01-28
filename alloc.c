@@ -14,5 +14,6 @@ void* wcalloc(uint64_t size) {
         //ereport(ERROR, errmsg("init_worker: malloc error %s  - ", err_msg));
         abort();
     }
+    memset(data, 0, size);
     return data;
 }

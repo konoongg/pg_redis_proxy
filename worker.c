@@ -89,16 +89,20 @@ void close_connection(EV_P_ struct ev_io* io_handle) {
 
 
 void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
+    ereport(INFO, errmsg("on_write_cb: start"));
     socket_data* data = (socket_data*)io_handle->data;
     socket_write_data* w_data = data->write_data;
     answer* cur_answer = w_data->answers->first;
-
+    ereport(INFO, errmsg("on_write_cb: cur_answer %p ", cur_answer));
     if (revents & EV_ERROR) {
         close_connection(loop, io_handle);
         abort();
     }
 
+    ereport(INFO, errmsg("on_write_cb"));
+
     while (cur_answer != NULL) {
+        ereport(INFO, errmsg("on_write_cb: cur_answer->answer %s, cur_answer->answer_size %d", cur_answer->answer, cur_answer->answer_size));
         int res =  write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
         if (res == cur_answer->answer_size) {
             answer* next_answer = cur_answer->next;
@@ -117,12 +121,15 @@ void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
             return;
         }
     }
-    w_data->answers = NULL;
+    w_data->answers->first = w_data->answers->last = NULL;
 
+
+    ev_io_start(loop, data->read_io_handle);
     ev_io_stop(loop, io_handle);
 }
 
 void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents) {
+    ereport(INFO, errmsg("on_read_db_cb: start"));
     socket_data* data = io_handle->data;
     socket_write_data* w_data = data->write_data;
     socket_read_data* r_data = data->read_data;
@@ -179,10 +186,16 @@ void process_req(EV_P_ socket_data* data) {
         cur_answer = w_data->answers->last;
         res = process_command(cur_req, cur_answer, data->db_conn);
         if (res == DONE) {
+            ereport(INFO, errmsg("process_req: DONE"));
             free_req(cur_req);
             r_data->reqs->first = r_data->reqs->first->next;
         } else if (res == DB_REQ) {
+            ereport(INFO, errmsg("process_req: DB_REQ data->db_conn->pipe_to_db[0] %d", data->db_conn->pipe_to_db[0]));
+
+            ev_io_init(data->read_db_handle, on_read_db_cb, data->db_conn->pipe_to_db[0], EV_READ);
             ev_io_start(loop, data->read_db_handle);
+
+            return;
         } else if  (res == PROCESS_ERR) {
             abort();
         }
@@ -222,6 +235,7 @@ void on_read_cb(EV_P_ struct ev_io* io_handle, int revents) {
             }
             ev_io_stop(loop, io_handle);
             process_req(loop, data);
+            return;
         } else if (status == NOT_ALL) {
             return;
         }

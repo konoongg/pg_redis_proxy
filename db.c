@@ -34,15 +34,19 @@ int register_command(req_to_db* new_req, db_connect* db_conn) {
     }
 
     if (req_wait_plan->first == NULL) {
-        req_wait_plan->first = req_wait_plan->last = wcalloc(sizeof(req_queue));
+        ereport(INFO, errmsg("register_command: req_wait_plan->first == NULL"));
+        req_wait_plan->first = req_wait_plan->last = new_req;
     } else {
-        req_wait_plan->last->next = wcalloc(sizeof(req_queue));
+        ereport(INFO, errmsg("register_command: req_wait_plan->first != NULL"));
+        req_wait_plan->last->next = new_req;
         req_wait_plan->last = req_wait_plan->last->next;
     }
-    req_wait_plan->last = new_req;
+    ereport(INFO, errmsg("register_command: new_req->req %s", new_req->req));
     req_wait_plan->last->next = NULL;
     req_wait_plan->queue_size++;
 
+
+    ereport(INFO, errmsg("register_command: req_wait_plan->last %p", req_wait_plan->last));
     if (pthread_cond_signal(req_wait_plan->cond_has_requests)) {
         return -1;
     }
@@ -56,6 +60,7 @@ int register_command(req_to_db* new_req, db_connect* db_conn) {
         return -1;
     }
 
+    ereport(INFO, errmsg("register_command: register"));
     return db_conn->pipe_to_db[1];
 }
 
@@ -137,7 +142,10 @@ void* start_db_worker(void*) {
 
     while(true) {
 
-        if (pthread_mutex_lock(req_wait_plan->lock) != 0) {
+        int err = pthread_mutex_lock(req_wait_plan->lock);
+        if (err != 0) {
+            char* msg_err = strerror(err);
+            ereport(INFO, errmsg("start_db_worker: pthread_mutex_lock error %s", msg_err));
             abort();
         }
 
@@ -146,31 +154,37 @@ void* start_db_worker(void*) {
                 abort();
             }
         }
-
         cur_req = req_wait_plan->first;
 
         req_wait_plan->first = req_wait_plan->first->next;
         req_wait_plan->queue_size--;
 
-        if (pthread_mutex_unlock(req_wait_plan->lock) != 0) {
+        err = pthread_mutex_unlock(req_wait_plan->lock);
+        if (err != 0) {
             abort();
         }
-
 
         res = PQexec(backends->connection[0]->conn, cur_req->req);
 
-        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        if (res == NULL) {
+            ereport(INFO, errmsg("start_db_worker: res == NULL PQexec %s", PQerrorMessage(backends->connection[0]->conn)));
             abort();
         }
 
+        if (PQresultStatus(res) != PGRES_COMMAND_OK && PQresultStatus(res) != PGRES_TUPLES_OK) {
+            ereport(INFO, errmsg("start_db_worker: PQresultStatus %d  error PQexec %s", PQresultStatus(res), PQerrorMessage(backends->connection[0]->conn)));
+            abort();
+        }
         if (cur_req->reason == WAIT_DATA) {
             answer* full_answer;
             answer** answers;
-            socket_write_data* data;
+            answer* data;
 
             count_rows = PQntuples(res);
             count_column = PQnfields(res);
             answers  = wcalloc(count_rows * sizeof(answer*));
+            ereport(INFO, errmsg("start_db_worker: count_rows %d count_column %d", count_rows, count_column ));
+
             for (int i = 0; i < count_rows; ++i) {
                 char** tuple = wcalloc(count_column * sizeof(char*));
                 int* tuple_size = wcalloc(count_column * sizeof(int));
@@ -183,12 +197,15 @@ void* start_db_worker(void*) {
                 }
                 answers[i] = wcalloc(sizeof(answer));
                 create_array_bulk_string_resp(answers[i], count_rows, tuple, tuple_size);
+                ereport(INFO, errmsg("start_db_worker: answers[%d]->answer %p answers[%d]->answer_size %d", i, answers[i]->answer, i, answers[i]->answer_size ));
             }
             full_answer = wcalloc(sizeof(answer));
             init_array_by_elems(full_answer, count_rows, answers);
             data = cur_req->data;
-            data->answers->last->answer = full_answer->answer;
-            data->answers->last->answer_size = full_answer->answer_size;
+            ereport(INFO, errmsg("start_db_worker: full_answer->answer %p full_answer->answer_size%d", full_answer->answer, full_answer->answer_size ));
+            ereport(INFO, errmsg("start_db_worker: data %p ", data));
+            data->answer = full_answer->answer;
+            data->answer_size = full_answer->answer_size;
             if (lock_cache_basket(cur_req->key, cur_req->key_size) == -1) {
                 abort();
             }
@@ -203,7 +220,7 @@ void* start_db_worker(void*) {
                 abort();
             }
         } else if (cur_req->reason == WAIT_SYNC) {
-             if (lock_cache_basket(cur_req->key, cur_req->key_size) == -1) {
+            if (lock_cache_basket(cur_req->key, cur_req->key_size) == -1) {
                 abort();
             }
 
@@ -213,7 +230,6 @@ void* start_db_worker(void*) {
                 abort();
             }
         }
-
 
         PQclear(res);
         free_req(cur_req);

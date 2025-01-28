@@ -28,10 +28,10 @@ void init_attribute(table_attribute* attr, char* key, int key_size) {
                 attr->table[table_size] = '\0';
                 memcpy(attr->table, key  + start_index, cur_index - start_index);
                 state = COLUMN;
-                start_index = cur_index;
+                start_index = cur_index + 1;
             } else if (state == COLUMN) {
                 int column_size = cur_index - start_index;
-                int value_size = key_size - cur_index;
+                int value_size = key_size - cur_index + 1;
 
                 attr->column = wcalloc((column_size + 1) * sizeof(char));
                 attr->column[column_size] = '\0';
@@ -39,8 +39,8 @@ void init_attribute(table_attribute* attr, char* key, int key_size) {
                 attr->value[value_size] = '\0';
                 attr->column_size = column_size;
                 attr->value_size = value_size;
-                memcpy(attr->column, key  + start_index, cur_index - start_index);
-                memcpy(attr->value, key  + cur_index, key_size - cur_index);
+                memcpy(attr->column, key  + start_index, column_size);
+                memcpy(attr->value, key  + cur_index + 1, value_size);
                 return;
             }
         }
@@ -54,7 +54,7 @@ void free_attr(table_attribute* attr) {
     free(attr);
 }
 
-req_to_db* create_pg_get(client_req* req) {
+req_to_db* create_pg_get(client_req* req, void* data) {
     char* req_mes;
     int size_req;
     req_to_db* new_req;
@@ -64,7 +64,7 @@ req_to_db* create_pg_get(client_req* req) {
     size_req = SELECT_BASE_SIZE + attr->column_size + attr->table_size + attr->value_size + 1; // \0(+1)
 
     req_mes = wcalloc(size_req * sizeof(char));
-    snprintf(req_mes, size_req, "SELECT * FROM %s WHERE %s = %s;", attr->table, attr->column, attr->value);
+    snprintf(req_mes, size_req, "SELECT * FROM %s WHERE %s = '%s';", attr->table, attr->column, attr->value);
     free_attr(attr);
 
     new_req = wcalloc(sizeof(req_to_db));
@@ -74,6 +74,7 @@ req_to_db* create_pg_get(client_req* req) {
     new_req->key = req->argv[1];
     new_req->key_size = req->argv_size[1];
     new_req->size_req = size_req;
+    new_req->data = data;
     return new_req;
 }
 

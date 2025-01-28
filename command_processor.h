@@ -46,6 +46,7 @@ enum process_result {
     DONE,
     PROCESS_ERR,
     DB_REQ,
+    NONE,
 };
 
 #endif
