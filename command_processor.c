@@ -82,7 +82,13 @@ tuple* create_tuple(char* value, int value_size) {
             new_tuple->attr_name_size[cur_count_attr] = attr_name_size;
             new_tuple->attr_size[cur_count_attr] = attr_size;
             cur_count_attr++;
-            start_pos = cur_pos;
+
+            ereport(INFO, errmsg("create_tuple: cur_count_attr %d ", cur_count_attr -1));
+
+            for (int i = 0; i < attr_size; ++i) {
+                ereport(INFO, errmsg("create_tuple: new_tuple->attr %d %c ", new_tuple->attr[cur_count_attr - 1][i], new_tuple->attr[cur_count_attr - 1][i]));
+            }
+            start_pos = cur_pos + 1;
         }
     }
     return new_tuple;

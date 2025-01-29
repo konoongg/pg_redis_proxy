@@ -148,9 +148,10 @@ void init_array_by_elems(answer* answ, int count_elems, answer** elems) {
     int index = 0;
     char str_size[MAX_STR_NUM_SIZE];
 
+
     snprintf(str_size, MAX_STR_NUM_SIZE, "%d", count_elems); // *<integer>\r\n
 
-    answer_size = 1  + strlen(str_size) + 2;
+    answer_size = 1 + strlen(str_size) + 2;
 
     for (int i = 0; i < count_elems; ++i) {
         answer_size += elems[i]->answer_size;

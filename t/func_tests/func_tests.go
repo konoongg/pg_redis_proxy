@@ -29,7 +29,9 @@ const (
 		CREATE TABLE IF NOT EXISTS test (
 			test1 TEXT,
 			test2 TEXT,
-			test3 TEXT
+			test3 TEXT,
+
+			UNIQUE (test1, test2, test3)
 		);`
 
 	simpleDropQuery = `DROP TABLE IF EXISTS test;`
@@ -48,24 +50,25 @@ type TestConn struct {
 	connToCache net.Conn
 }
 
-func (conn *TestConn) Close() error {
+func (conn *TestConn) Close() {
+
+	fmt.Println("closed")
 	err := conn.connToCache.Close()
 	if err != nil {
-		return err
+		fmt.Println("error cache drop exec: %w", err)
 	}
-
+	fmt.Println("1")
 	_, err = conn.connToPG.Exec(simpleDropQuery)
 	if err != nil {
-		return fmt.Errorf("error postgres drop exec: %w", err)
+		fmt.Println("error postgres drop exec: %w", err)
 	}
 
+	fmt.Println("2")
 	err = conn.connToPG.Close()
-
 	if err != nil {
-		return err
+		fmt.Println("error postgres close: %w", err)
 	}
-
-	return nil
+	fmt.Println("closed fin")
 }
 
 func (conn *TestConn) Open() error {
@@ -104,10 +107,10 @@ func simpleSetTest(test *Test) bool {
 		test.err = "create connection error(" + err.Error() + ")"
 		return false
 	}
+	defer conn.Close()
 
 	request := []byte("*3\r\n$3\r\nset\r\n$26\r\ntest.test1.simple_set_test\r\n$37\r\ntest1:simple_set_test.test2:2.test3:3\r\n")
 	res := DoTest(conn.connToCache, test, request)
-	err = conn.Close()
 	if err != nil {
 		test.err = "set error"
 		return false
@@ -138,6 +141,7 @@ func simpleGetTest(test *Test) bool {
 
 	if !res {
 		test.err = "get err"
+		conn.Close()
 	}
 	return res
 }
@@ -151,6 +155,7 @@ func simpleDelTest(test *Test) bool {
 		return false
 	}
 	defer conn.Close()
+
 	request := []byte("*3\r\n$3\r\nset\r\n$26\r\ntest.test1.simple_del_test\r\n$37\r\ntest1:simple_del_test.test2:2.test3:3\r\n")
 	test.waitAnswer = []byte("+OK\r\n")
 
@@ -192,7 +197,7 @@ func doubleDelTest(test *Test) bool {
 		return false
 	}
 	defer conn.Close()
-	request := []byte("*3\r\n$3\r\nset\r\n$32\r\ntest.test1.simple_doubleDel_test\r\n$43\r\ntest1:simple_doubleDel_test.test2:2.test3:3\r\n")
+	request := []byte("*3\r\n$3\r\nset\r\n$26\r\ntest.test1.double_del_test\r\n$37\r\ntest1:double_del_test.test2:2.test3:3\r\n")
 	test.waitAnswer = []byte("+OK\r\n")
 
 	if !DoTest(conn.connToCache, test, request) {
@@ -201,7 +206,7 @@ func doubleDelTest(test *Test) bool {
 	}
 
 	test.waitAnswer = []byte(":1\r\n")
-	request = []byte("*2\r\n$3\r\ndel\r\n$32\r\ntest.test1.simple_doubleDel_test\r\n")
+	request = []byte("*2\r\n$3\r\ndel\r\n$26\r\ntest.test1.double_del_test\r\n")
 	if !DoTest(conn.connToCache, test, request) {
 		test.err = "first det err"
 		return false
@@ -223,9 +228,9 @@ func getFromDb(test *Test) bool {
 		test.err = "create connection error(" + err.Error() + ")"
 		return false
 	}
-	//defer conn.Close()
+	defer conn.Close()
 
-	insertQuery := `INSERT INTO test (test1, test2, test3) VALUES ('getFromDb', '2', '3')`
+	insertQuery := `INSERT INTO test (test1, test2, test3) VALUES ('get_from_db', '2', '3')`
 	_, err = conn.connToPG.Exec(insertQuery)
 	if err != nil {
 		test.err = "can't connect to db (" + err.Error() + ")"
@@ -289,10 +294,10 @@ func main() {
 		// 	testName: "simple get test",
 		// 	callback: simpleGetTest,
 		// },
-		// {
-		// 	testName: "simple del test",
-		// 	callback: simpleDelTest,
-		// },
+		{
+			testName: "simple del test",
+			callback: simpleDelTest,
+		},
 		// {
 		// 	testName: "double del test",
 		// 	callback: doubleDelTest,
@@ -301,10 +306,10 @@ func main() {
 		// 	testName: "simple del test x2",
 		// 	callback: simpleDelTest_x2,
 		// },
-		{
-			testName: "get from Db",
-			callback: getFromDb,
-		},
+		// {
+		// 	testName: "get from Db",
+		// 	callback: getFromDb,
+		// },
 	}
 
 	for test_num, test := range tests {

@@ -66,7 +66,6 @@ int register_command(req_to_db* new_req, db_connect* db_conn) {
 
 void free_req(req_to_db* req) {
     free(req->req);
-    free(req->data);
     free(req);
 }
 
@@ -132,6 +131,26 @@ void init_db(void) {
     req_wait_plan->queue_size = 0;
 }
 
+
+db_data* pars_db_data(PGresult* res) {
+    db_data* data = wcalloc(sizeof(db_data));
+    data->count_rows = PQntuples(res);
+    data->count_column = PQnfields(res);
+
+    data->tuples = wcalloc(data->count_rows * sizeof(char**));
+    data->size_value = wcalloc(data->count_rows * sizeof(int*));
+
+    for (int row = 0; row < data->count_rows; ++row) {
+        data->tuples[row] = wcalloc(data->count_column * sizeof(char*));
+        data->size_value[row] = wcalloc(data->count_column * sizeof(int));
+        for (int column = 0; column < data->count_column; ++column) {
+            data->tuples[row][column] = PQgetvalue(res, row, column);
+            data->size_value[row][column] = PQgetlength(res, row, column);
+        }
+    }
+    return data;
+}
+
 void* start_db_worker(void*) {
     int count_column;
     int count_rows;
@@ -163,6 +182,11 @@ void* start_db_worker(void*) {
         if (err != 0) {
             abort();
         }
+        ereport(INFO, errmsg("start_db_worker: cur_req->req_size %d",cur_req->size_req));
+
+        for (int i = 0; i < cur_req->size_req; ++i) {
+            ereport(INFO, errmsg("start_db_worker: cur_req->req[%d] %d %c", i, cur_req->req[i], cur_req->req[i]));
+        }
 
         res = PQexec(backends->connection[0]->conn, cur_req->req);
 
@@ -175,37 +199,35 @@ void* start_db_worker(void*) {
             ereport(INFO, errmsg("start_db_worker: PQresultStatus %d  error PQexec %s", PQresultStatus(res), PQerrorMessage(backends->connection[0]->conn)));
             abort();
         }
+
         if (cur_req->reason == WAIT_DATA) {
             answer* full_answer;
             answer** answers;
             answer* data;
 
-            count_rows = PQntuples(res);
-            count_column = PQnfields(res);
-            answers  = wcalloc(count_rows * sizeof(answer*));
-            ereport(INFO, errmsg("start_db_worker: count_rows %d count_column %d", count_rows, count_column ));
+            db_data* pg_data = pars_db_data(res);
+            answers  = wcalloc(pg_data->count_rows * sizeof(answer*));
 
-            for (int i = 0; i < count_rows; ++i) {
-                char** tuple = wcalloc(count_column * sizeof(char*));
-                int* tuple_size = wcalloc(count_column * sizeof(int));
+            for (int i = 0; i < pg_data->count_rows; ++i) {
+                answers[i] = wcalloc(sizeof(answer*));
+                create_array_bulk_string_resp(answers[i], pg_data->count_column, pg_data->tuples[i], pg_data->size_value[i]);
 
-                for (int j = 0; j < count_column; ++j) {
-                    char* value = PQgetvalue(res, i, j);
-                    int  value_size = PQgetlength(res, i, j);
-                    tuple[i] = wcalloc(value_size * sizeof(char));
-                    memcpy(tuple[i], value, value_size);
+
+                ereport(INFO, errmsg("start_db_worker:  answers[%d]->answer_size %d",i, answers[i]->answer_size));
+
+                for (int j = 0; j < answers[i]->answer_size; ++j) {
+                    ereport(INFO, errmsg("start_db_worker:  answers[%d]->answer[%d] %d %c",
+                        i, j,answers[i]->answer[j], answers[i]->answer[j] ));
                 }
-                answers[i] = wcalloc(sizeof(answer));
-                create_array_bulk_string_resp(answers[i], count_rows, tuple, tuple_size);
-                ereport(INFO, errmsg("start_db_worker: answers[%d]->answer %p answers[%d]->answer_size %d", i, answers[i]->answer, i, answers[i]->answer_size ));
             }
+
             full_answer = wcalloc(sizeof(answer));
-            init_array_by_elems(full_answer, count_rows, answers);
+            init_array_by_elems(full_answer, pg_data->count_rows, answers);
             data = cur_req->data;
-            ereport(INFO, errmsg("start_db_worker: full_answer->answer %p full_answer->answer_size%d", full_answer->answer, full_answer->answer_size ));
-            ereport(INFO, errmsg("start_db_worker: data %p ", data));
-            data->answer = full_answer->answer;
-            data->answer_size = full_answer->answer_size;
+
+            data->answer = wcalloc(data->answer_size  * sizeof(char));
+            memcpy(data->answer, full_answer->answer, data->answer_size);;
+
             if (lock_cache_basket(cur_req->key, cur_req->key_size) == -1) {
                 abort();
             }
@@ -213,7 +235,6 @@ void* start_db_worker(void*) {
             if (set_cache(create_data(cur_req->key, cur_req->key_size, full_answer, free_resp_answ)) != 0) {
                 abort();
             }
-
             notify(cur_req->key, cur_req->key_size, CONN_DB_OK);
 
             if (unlock_cache_basket(cur_req->key, cur_req->key_size) == -1) {

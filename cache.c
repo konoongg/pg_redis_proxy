@@ -105,6 +105,7 @@ int set_cache(cache_data new_data) {
             basket->last = basket->last->next;
         }
 
+        data->pend_list = wcalloc(sizeof(pending_list));
         data->key = wcalloc(new_data.key_size * sizeof(char*));
         data->next = NULL;
         memcpy(data->key, new_data.key, new_data.key_size);
@@ -207,6 +208,7 @@ void subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
 
     cache_data* data = find_data_in_basket(basket, key, key_size);
     if (data == NULL) {
+        ereport(INFO, errmsg("subscribe: data is NULL "));
         if (basket->first == NULL) {
             basket->first = basket->last = wcalloc(sizeof(cache_data));
         } else {
@@ -220,6 +222,8 @@ void subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
         basket->last->next = NULL;
         data = basket->last;
     }
+
+    ereport(INFO, errmsg("subscribe: data %p", data));
 
     if (data->pend_list->first == NULL) {
             data->pend_list->first = data->pend_list->last = wcalloc(sizeof(pending));

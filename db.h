@@ -13,6 +13,7 @@ typedef enum result_db result_db;
 typedef enum set_result set_result;
 typedef struct backend_connection backend_connection;
 typedef struct backend_pool backend_pool;
+typedef struct db_data db_data;
 typedef struct req_queue req_queue;
 typedef struct req_to_db req_to_db;
 
@@ -56,6 +57,13 @@ struct backend_pool {
 enum result_db {
     CONN_DB_ERR = -1,
     CONN_DB_OK,
+};
+
+struct db_data {
+    char*** tuples;
+    int** size_value;
+    int count_rows;
+    int count_column;
 };
 
 #endif

@@ -6,7 +6,7 @@
 
 #define SELECT_BASE_SIZE 28
 #define SET_BASE_SIZE 56
-#define DELETE_BASE_SIZE 21
+#define DELETE_BASE_SIZE 23
 #define TRANSACTION_SIZE 12
 
 typedef enum attr_parser attr_parser;
