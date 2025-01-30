@@ -177,9 +177,13 @@ int get_array_size(answer* answ) {
     char *endptr;
     int count_len_array ;
 
+    errno = 0;
     count_len_array =  strtol(answ->answer + 1, &endptr, 10);
-
     if (errno != 0 || *endptr != '\r') {
+        char* err = strerror(errno);
+        int err_code = errno;
+        ereport(INFO, errmsg("get_array_size: errno %d err %s  *endptr %d %c count_len_array %d", err_code,  err,*endptr,*endptr, count_len_array));
+
         return -1;
     }
 

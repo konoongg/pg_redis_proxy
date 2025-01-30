@@ -85,6 +85,7 @@ int set_cache(cache_data new_data) {
     ereport(INFO, errmsg("set_cache: start"));
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
     cache_data* data = basket->first;
+    ereport(INFO, errmsg("set_cache: basket %p basket->first %p", basket, basket->first));
     while (data != NULL) {
         ereport(INFO, errmsg("set_cache: data %p ", data));
         if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
@@ -110,16 +111,20 @@ int set_cache(cache_data new_data) {
         data->next = NULL;
         memcpy(data->key, new_data.key, new_data.key_size);
         data->key_size = new_data.key_size;
-        data->free_data = new_data.free_data;
-    }
-
+        ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
+    } else { ereport(INFO, errmsg("set_cache: data != NULL")); }
+    data->free_data = new_data.free_data;
+    ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
     data->last_time = time(NULL);
     if (data->last_time == -1) {
+        ereport(INFO, errmsg("set_cache: finish  1"));
         return -1;
     }
 
     data->data = new_data.data;
     ereport(INFO, errmsg("set_cache: data %p", data));
+
+    ereport(INFO, errmsg("set_cache: finish  0"));
     return 0;
 }
 
@@ -144,13 +149,16 @@ int delete_cache(char* key, int key_size) {
     } else if (data == basket->first) {
         ereport(INFO, errmsg("delete_cache: data is first"));
         basket->first = data->next;
+        ereport(INFO, errmsg("delete_cache: basket %p basket->first %p", basket, basket->first));
     } else {
         ereport(INFO, errmsg("delete_cache: data is NOT first prev_data %p data->next %p", prev_data, data->next));
         prev_data->next = data->next;
-        if (data->next == NULL) {
-            basket->last = prev_data;
-        }
     }
+
+    if (data->next == NULL) {
+        basket->last = prev_data;
+    }
+
     data->free_data(data->data);
     free(data);
     return 1;
@@ -206,6 +214,8 @@ cache_data create_data(char* key, int key_size, void* data, void (*free_data)(vo
 void subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
     cache_basket* basket = get_basket(key, key_size);
 
+    ereport(INFO, errmsg("subscribe: notify_fd %d ", notify_fd));
+
     cache_data* data = find_data_in_basket(basket, key, key_size);
     if (data == NULL) {
         ereport(INFO, errmsg("subscribe: data is NULL "));
@@ -233,6 +243,10 @@ void subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
     }
     data->pend_list->last->next = NULL;
     data->pend_list->last->notify_fd = notify_fd;
+    ereport(INFO, errmsg("subscribe: data->pend_list %p", data->pend_list));
+
+    ereport(INFO, errmsg("subscribe: data->pend_list->last %p", data->pend_list->last));
+    ereport(INFO, errmsg("subscribe: basket %p basket->first  %p ", basket, basket->first));
 }
 
 void notify(char* key, int key_size, char mes) {
@@ -248,11 +262,17 @@ void notify(char* key, int key_size, char mes) {
             pending* next_pend = cur_pend->next;
 
             ereport(INFO, errmsg("notify:cur_pend->notify_fd %d", cur_pend->notify_fd));
-            if (write(cur_pend->notify_fd, &mes, 1 ) != 1) {
+            int err = write(cur_pend->notify_fd, &mes, 1);
+            if (err == -1) {
+                char* err_msg = strerror(errno);
+                ereport(INFO, errmsg("notify: error %s", err_msg));
                 abort();
             }
+            close(cur_pend->notify_fd);
             free(cur_pend);
             cur_pend = next_pend;
         }
+        data->pend_list->first = data->pend_list->last = NULL;
+        ereport(INFO, errmsg("notify: basket %p basket->first  %p ", basket, basket->first));
     }
 }

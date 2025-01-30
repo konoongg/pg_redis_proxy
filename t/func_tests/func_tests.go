@@ -52,23 +52,19 @@ type TestConn struct {
 
 func (conn *TestConn) Close() {
 
-	fmt.Println("closed")
 	err := conn.connToCache.Close()
 	if err != nil {
 		fmt.Println("error cache drop exec: %w", err)
 	}
-	fmt.Println("1")
 	_, err = conn.connToPG.Exec(simpleDropQuery)
 	if err != nil {
 		fmt.Println("error postgres drop exec: %w", err)
 	}
 
-	fmt.Println("2")
 	err = conn.connToPG.Close()
 	if err != nil {
 		fmt.Println("error postgres close: %w", err)
 	}
-	fmt.Println("closed fin")
 }
 
 func (conn *TestConn) Open() error {
@@ -188,6 +184,20 @@ func simpleDelTest_x2(test *Test) bool {
 	return true
 }
 
+func simpleSetTest_x2(test *Test) bool {
+	if !simpleSetTest(test) {
+		test.err = "first simple del err"
+		return false
+	}
+
+	if !simpleSetTest(test) {
+		test.err = "second simple del err"
+		return false
+	}
+
+	return true
+}
+
 func doubleDelTest(test *Test) bool {
 	var conn TestConn
 
@@ -291,17 +301,21 @@ func main() {
 		// 	callback: simpleSetTest,
 		// },
 		// {
+		// 	testName: "simple sel test x2",
+		// 	callback: simpleSetTest_x2,
+		// },
+		// {
 		// 	testName: "simple get test",
 		// 	callback: simpleGetTest,
 		// },
-		{
-			testName: "simple del test",
-			callback: simpleDelTest,
-		},
 		// {
-		// 	testName: "double del test",
-		// 	callback: doubleDelTest,
+		// 	testName: "simple del test",
+		// 	callback: simpleDelTest,
 		// },
+		{
+			testName: "double del test",
+			callback: doubleDelTest,
+		},
 		// {
 		// 	testName: "simple del test x2",
 		// 	callback: simpleDelTest_x2,

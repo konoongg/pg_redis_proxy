@@ -151,11 +151,14 @@ void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents) {
     }
 
 
+
     res = read(io_handle->fd, &status, 1);
 
     if (res != 1) {
         abort();
     }
+
+    close(io_handle->fd);
 
     ev_io_stop(loop, io_handle);
     if (status == CONN_DB_OK) {
