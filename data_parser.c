@@ -8,11 +8,11 @@
 #include "connection.h"
 #include "data_parser.h"
 
-void replace_part_of_buffer(socket_read_data* data, int cur_buffer_index);
+void replace_part_of_buffer(read_data* data, int cur_buffer_index);
 
 
 // saves data to a buffer if more than one packet has been written off
-void replace_part_of_buffer(socket_read_data* data, int cur_buffer_index) {
+void replace_part_of_buffer(read_data* data, int cur_buffer_index) {
     memmove(data->read_buffer, data->read_buffer + cur_buffer_index, data->cur_buffer_size - cur_buffer_index);
     data->cur_buffer_size -=  cur_buffer_index;
 }
@@ -25,17 +25,17 @@ void replace_part_of_buffer(socket_read_data* data, int cur_buffer_index) {
  * the received data will be processed, and the parsing state is saved. When the remaining data arrives,
  * parsing will continue correctly.
  */
-exit_status pars_data(socket_read_data* data) {
+exit_status pars_data(read_data* data) {
     int cur_buffer_index  = 0;
     for (; cur_buffer_index < data->cur_buffer_size; ++cur_buffer_index) {
         char c = data->read_buffer[cur_buffer_index];
-        read_status cur_status = data->parsing.cur_read_status;
+        read_status cur_status = data->pars.cur_read_status;
         char* new_str;
 
         if (c == '*' && cur_status == ARRAY_WAIT) {
-            data->parsing.cur_read_status = ARGC_WAIT;
+            data->pars.cur_read_status = ARGC_WAIT;
         } else if ((c >= '0' && c <= '9')  && (cur_status == NUM_WAIT || cur_status == ARGC_WAIT) ) {
-            data->parsing.parsing_num = (data->parsing.parsing_num * 10) + (c - '0');
+            data->pars.parsing_num = (data->pars.parsing_num * 10) + (c - '0');
         } else if (c == '\r' && cur_status == ARGC_WAIT) {
 
             if (data->reqs->first == NULL) {
@@ -46,76 +46,69 @@ exit_status pars_data(socket_read_data* data) {
                 data->reqs->last = data->reqs->last->next;
             }
             data->reqs->last->next = NULL;
-            data->reqs->last->argc = data->parsing.parsing_num;
+            data->reqs->last->argc = data->pars.parsing_num;
             data->reqs->last->argv = wcalloc(data->reqs->last->argc * sizeof(char*));
 
             data->reqs->last->argv_size = wcalloc(data->reqs->last->argc * sizeof(int));
 
-            data->parsing.parsing_num = 0;
-            data->parsing.next_read_status = START_STRING_WAIT;
-            data->parsing.cur_read_status = LF;
+            data->pars.parsing_num = 0;
+            data->pars.next_read_status = START_STRING_WAIT;
+            data->pars.cur_read_status = LF;
         } else if (c == '\r' && cur_status == CR) {
-            //ereport(INFO, errmsg("pars_data: 4 cur_status == CR"));
-            data->parsing.cur_read_status = LF;
+            data->pars.cur_read_status = LF;
         } else if (c == '\n' && cur_status == LF) {
-            //ereport(INFO, errmsg("pars_data: 5 cur_status == LF"));
-            data->parsing.cur_read_status = data->parsing.next_read_status;
+            data->pars.cur_read_status = data->pars.next_read_status;
         } else if (c == '$' && cur_status == START_STRING_WAIT) {
-            //ereport(INFO, errmsg("pars_data: 6 cur_status == START_STRING_WAIT"));
-            data->parsing.cur_read_status = NUM_WAIT;
+            data->pars.cur_read_status = NUM_WAIT;
         } else if (c == '\r' && cur_status == NUM_WAIT) {
-
-            //ereport(INFO, errmsg("pars_data: 7 cur_status == NUM_WAIT"));
-            data->parsing.size_str = data->parsing.parsing_num;
-            data->parsing.cur_size_str = 0;
-            data->parsing.parsing_str = (char*)wcalloc((data->parsing.size_str + 1)  * sizeof(char));
-            data->parsing.next_read_status = STRING_WAIT;
-            data->parsing.cur_read_status = LF;
-            data->parsing.parsing_num = 0;
+            data->pars.size_str = data->pars.parsing_num;
+            data->pars.cur_size_str = 0;
+            data->pars.parsing_str = (char*)wcalloc((data->pars.size_str + 1)  * sizeof(char));
+            data->pars.next_read_status = STRING_WAIT;
+            data->pars.cur_read_status = LF;
+            data->pars.parsing_num = 0;
         } else if (cur_status == STRING_WAIT) {
+            data->pars.parsing_str[data->pars.cur_size_str] = c;
+            data->pars.cur_size_str += 1;
 
-            //ereport(INFO, errmsg("pars_data: 8 cur_status == STRING_WAIT"));
-            data->parsing.parsing_str[data->parsing.cur_size_str] = c;
-            data->parsing.cur_size_str += 1;
+            if (data->pars.cur_size_str == data->pars.size_str) {
+                data->pars.parsing_str[data->pars.size_str] = '\0';
 
-            if (data->parsing.cur_size_str == data->parsing.size_str) {
-                data->parsing.parsing_str[data->parsing.size_str] = '\0';
+                new_str = (char*)wcalloc((data->pars.size_str + 1) * sizeof(char));
 
-                new_str = (char*)wcalloc((data->parsing.size_str + 1) * sizeof(char));
-
-                memcpy(new_str, data->parsing.parsing_str, data->parsing.size_str + 1);
-                data->reqs->last->argv[data->parsing.cur_count_argv] = new_str;
-                data->reqs->last->argv_size[data->parsing.cur_count_argv] = data->parsing.cur_size_str;
-                free(data->parsing.parsing_str);
-                data->parsing.parsing_str = NULL;
-                data->parsing.cur_count_argv++;
-                data->parsing.size_str = data->parsing.cur_size_str = 0;
+                memcpy(new_str, data->pars.parsing_str, data->pars.size_str + 1);
+                data->reqs->last->argv[data->pars.cur_count_argv] = new_str;
+                data->reqs->last->argv_size[data->pars.cur_count_argv] = data->pars.cur_size_str;
+                free(data->pars.parsing_str);
+                data->pars.parsing_str = NULL;
+                data->pars.cur_count_argv++;
+                data->pars.size_str = data->pars.cur_size_str = 0;
 
 
 
-                //ereport(INFO, errmsg("pars_data: data->parsing.cur_count_argv(%d) == data->reqs->last->argc(%d) ",data->parsing.cur_count_argv,  data->reqs->last->argc));
-                if (data->parsing.cur_count_argv == data->reqs->last->argc) {
-                    data->parsing.cur_count_argv = 0;
-                    data->parsing.cur_read_status = CR;
-                    data->parsing.next_read_status = END;
+                //ereport(INFO, errmsg("pars_data: data->pars.cur_count_argv(%d) == data->reqs->last->argc(%d) ",data->pars.cur_count_argv,  data->reqs->last->argc));
+                if (data->pars.cur_count_argv == data->reqs->last->argc) {
+                    data->pars.cur_count_argv = 0;
+                    data->pars.cur_read_status = CR;
+                    data->pars.next_read_status = END;
                 } else {
-                    data->parsing.cur_read_status = CR;
-                    data->parsing.next_read_status = START_STRING_WAIT;
+                    data->pars.cur_read_status = CR;
+                    data->pars.next_read_status = START_STRING_WAIT;
                 }
             }
         } else if(cur_status == END) {
             //ereport(INFO, errmsg("pars_data:9 cur_status == END"));
             replace_part_of_buffer(data, cur_buffer_index);
-            data->parsing.cur_read_status = ARRAY_WAIT;
+            data->pars.cur_read_status = ARRAY_WAIT;
             return ALL;
         } else {
-            //ereport(INFO, errmsg("pars_data: 10 unknown parsing state"));
+            //ereport(INFO, errmsg("pars_data: 10 unknown pars state"));
             return ERR;
         }
     }
 
-    if(data->parsing.cur_read_status == END) {
-        data->parsing.cur_read_status = ARRAY_WAIT;
+    if(data->pars.cur_read_status == END) {
+        data->pars.cur_read_status = ARRAY_WAIT;
         replace_part_of_buffer(data, cur_buffer_index);
         return ALL;
     }

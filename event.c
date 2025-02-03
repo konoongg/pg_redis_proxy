@@ -3,8 +3,11 @@
 #include "postgres.h"
 #include "utils/elog.h"
 
+#include "config.h"
 #include "connection.h"
 #include "event.h"
+
+extern config_redis config;
 
 // /*
 //  * This function is called when data arrives for reading in the corresponding socket.
@@ -50,69 +53,50 @@
 //     }
 // }
 
-// //When a client connects, a socket is created and two watchers are set up:
-// //the first one for reading is always active, and the second one for writing is activated only when data needs to be written.
-// //If there are any issues with connecting a new client, we don't want the entire proxy to break,
-// //so we simply log a failure message.
 void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
     wthread* wthrd = (wthread*)io_handle->data;
-    int err = pthread_spin_lock(wthrd->lock);
-    if (err != 0) {
-        ereport(INFO, errmsg("on_accept_cb: pthread_spin_lock() failed: %s\n", strerror(err)));
-	    abort();
+    connection* conn;
+    struct ev_io* read_io_handle;
+    struct ev_io* write_io_handle;
+    read_data* r_data;
+    write_data* w_data;
+    char* read_buffer;
+    int socket_fd;
+    requests* reqs;
+
+    socket_fd = accept(wthrd->listen_socket, NULL, NULL);
+    if (socket_fd == -1) {
+        abort();
     }
 
+    conn = (connection*)wcalloc(sizeof(connection));
+    read_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
+    write_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
+    w_data = (write_data*)wcalloc(sizeof(write_data));
+    r_data = (read_data*)wcalloc(sizeof(read_data));
 
-    int err = pthread_spin_unlock(wthrd->lock);
-    if (err != 0) {
-        ereport(INFO, errmsg("on_accept_cb: pthread_spin_unlock() failed: %s\n", strerror(err)));
-	    abort();
-    }
-//     accept_conf* conf = (accept_conf*)io_handle->data;
-//     char* read_buffer;
-//     int socket_fd;
-//     requests* reqs;
-//     socket_data* data;
-//     socket_read_data* r_data;
-//     socket_write_data* w_data;
-//     struct ev_io* read_db_handle;
-//     struct ev_io* read_io_handle;
-//     struct ev_io* write_io_handle;
+    read_buffer = wcalloc(config.worker_conf.buffer_size * sizeof(char));
+    reqs = wcalloc(sizeof(requests));
+    reqs->first = reqs->last = NULL;
+    reqs->count_req = 0;
 
-//     socket_fd = accept(conf->listen_socket, NULL, NULL);
-//     if (socket_fd == -1) {
-//         abort();
-//     }
+    conn->write_data = w_data;
+    conn->write_data->answers = wcalloc(sizeof(answer_list));
+    conn->write_data->answers->first = conn->write_data->answers->last = NULL;
+    conn->write_io_handle = write_io_handle;
 
-//     data = (socket_data*)wcalloc(sizeof(socket_data));
-//     read_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
-//     read_db_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
-//     write_io_handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
-//     w_data = (socket_write_data*)wcalloc(sizeof(socket_write_data));
-//     r_data = (socket_read_data*)wcalloc(sizeof(socket_read_data));
-
-//     read_buffer = wcalloc(conf->buffer_size * sizeof(char));
-//     reqs = wcalloc(sizeof(requests));
-//     reqs->first = reqs->last = NULL;
-//     reqs->count_req = 0;
-
-//     data->write_data = w_data;
-//     data->write_data->answers = wcalloc(sizeof(answer_list));
-//     data->write_data->answers->first = data->write_data->answers->last = NULL;
-//     data->write_io_handle = write_io_handle;
-
-//     data->read_data = r_data;
-//     data->read_data->cur_buffer_size = 0;
-//     data->read_data->buffer_size = conf->buffer_size;
-//     data->read_data->parsing.cur_count_argv = 0;
-//     data->read_data->parsing.cur_size_str = 0;
-//     data->read_data->parsing.parsing_num = 0;
-//     data->read_data->parsing.parsing_str = NULL;
-//     data->read_data->parsing.size_str = 0;
-//     data->read_data->read_buffer = read_buffer;
-//     data->read_data->parsing.cur_read_status = ARRAY_WAIT;
-//     data->read_data->reqs = reqs;
-//     data->read_io_handle = read_io_handle;
+    data->read_data = r_data;
+    data->read_data->cur_buffer_size = 0;
+    data->read_data->buffer_size = conf->buffer_size;
+    data->read_data->parsing.cur_count_argv = 0;
+    data->read_data->parsing.cur_size_str = 0;
+    data->read_data->parsing.parsing_num = 0;
+    data->read_data->parsing.parsing_str = NULL;
+    data->read_data->parsing.size_str = 0;
+    data->read_data->read_buffer = read_buffer;
+    data->read_data->parsing.cur_read_status = ARRAY_WAIT;
+    data->read_data->reqs = reqs;
+    data->read_io_handle = read_io_handle;
 
 //     read_io_handle->data = (void*)data;
 //     write_io_handle->data = (void*)data;
@@ -121,6 +105,28 @@ void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents) {
 //     ev_io_init(read_io_handle, on_read_cb, socket_fd, EV_READ);
 //     ev_io_init(write_io_handle, on_write_cb, socket_fd, EV_WRITE);
 //     ev_io_start(loop, read_io_handle);
+
+
+    int err = pthread_spin_lock(wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("on_accept_cb: pthread_spin_lock() failed: %s\n", strerror(err)));
+	    abort();
+    }
+
+    if (wthrd->active->first == NULL) {
+        wthrd->active->first = wthrd->active->last = wcalloc(sizeof(connection));
+    } else {
+        wthrd->active->last->next = wcalloc(sizeof(connection));
+        wthrd->active->last = wthrd->active->last->next ;
+    }
+
+    wthrd->active->last->status = ACCEPTED;
+
+    int err = pthread_spin_unlock(wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("on_accept_cb: pthread_spin_unlock() failed: %s\n", strerror(err)));
+	    abort();
+    }
 }
 
 void init_loop(wthread* wthrd) {

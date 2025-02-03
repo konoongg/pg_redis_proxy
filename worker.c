@@ -218,11 +218,33 @@ thread_local wthread wthrd;
 // }
 
 
+void process_read() {
+
+}
+
 void loop_step(void) {
-    int err = pthread_spin_lock(wthrd.lock); \
-    if (err != 0) { \
-		fprintf(stderr, "pthread_spin_lock() failed: %s\n", strerror(err)); \
-	    return -1; \
+    int err = pthread_spin_lock(wthrd.lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("loop_step: pthread_spin_lock() failed: %s\n", strerror(err)));
+	    abort();
+    }
+
+    connection* cur_conn = wthrd.active->first;
+
+    while (cur_conn != NULL) {
+        switch(cur_conn->status) {
+            case READED:
+                process_read();
+                break;
+        }
+        cur_conn = cur_conn->next;
+    }
+
+
+    err = pthread_spin_unlock(wthrd.lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("loop_step: pthread_spin_unlock() failed: %s\n", strerror(err)));
+	    abort();
     }
 }
 
@@ -250,8 +272,10 @@ void* start_worker(void* argv) {
     }
 
     init_loop(&wthrd);
-    wthrd.active = NULL;
-    wthrd.wait = NULL;
+    wthrd.active = wcalloc(sizeof(conn_list));
+    wthrd.active->first = wthrd.active->last = NULL;
+    wthrd.wait = wcalloc(sizeof(conn_list));
+    wthrd.wait->first = wthrd.wait->last = NULL;
     wthrd.active_size = 0;
 
     wthrd.lock = wcalloc(sizeof(pthread_spinlock_t));
