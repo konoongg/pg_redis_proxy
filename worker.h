@@ -1,7 +1,7 @@
 #ifndef WORKER_H
 #define WORKER_H
 
-#include "config.h"
+#include "connection.h"
 
 int init_workers();
 

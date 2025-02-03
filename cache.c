@@ -114,7 +114,7 @@ int set_cache(cache_data new_data) {
         ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
     } else { ereport(INFO, errmsg("set_cache: data != NULL")); }
     data->free_data = new_data.free_data;
-    ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
+=    ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
     data->last_time = time(NULL);
     if (data->last_time == -1) {
         ereport(INFO, errmsg("set_cache: finish  1"));
