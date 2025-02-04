@@ -17,9 +17,6 @@ typedef struct db_data db_data;
 typedef struct req_queue req_queue;
 typedef struct req_to_db req_to_db;
 
-int register_command(req_to_db* new_req, db_connect* db_conn);
-pthread_t init_db_worker(void);
-
 struct req_to_db {
     req_to_db* next;
     sub_reason reason;

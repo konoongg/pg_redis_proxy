@@ -48,49 +48,6 @@ void* start_worker(void* argv);
 extern config_redis config;
 thread_local wthread wthrd;
 
-
-// void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
-// }
-
-// void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents) {
-//     ereport(INFO, errmsg("on_read_db_cb: start"));
-//     socket_data* data = io_handle->data;
-//     socket_write_data* w_data = data->write_data;
-//     socket_read_data* r_data = data->read_data;
-
-//     answer* cur_answer;
-//     client_req* cur_req = r_data->reqs->first;
-//     int res;
-//     result_db status;
-
-//     if (revents & EV_ERROR) {
-//         close_connection(loop, io_handle);
-//         abort();
-//     }
-
-
-
-//     res = read(io_handle->fd, &status, 1);
-
-//     if (res != 1) {
-//         abort();
-//     }
-
-//     close(io_handle->fd);
-
-//     ev_io_stop(loop, io_handle);
-//     if (status == CONN_DB_OK) {
-//         //
-//     } else if (status == CONN_DB_ERR) {
-//         cur_answer = w_data->answers->last;
-//         process_err(cur_answer, "ERR");
-//     }
-//     free_req(cur_req);
-//     r_data->reqs->first = r_data->reqs->first->next;
-//     process_req(loop, data);
-// }
-
-
 void finish_connection(connection* conn) {
     event_stop(conn->wthrd, conn->r_data->handle);
     event_stop(conn->wthrd, conn->w_data->handle);
@@ -113,7 +70,7 @@ proc_status process_write(connection* conn) {
                 return ALIVE_PROC;
             }
             finish_connection(conn);
-            return;
+            return DEL_PROC;
         } else {
             cur_answer->answer_size -=  res;
             memmove(cur_answer->answer, cur_answer + res, cur_answer->answer_size);
@@ -285,7 +242,7 @@ void* start_worker(void* argv) {
     return NULL;
 }
 
-int init_workers(void) {
+void init_workers(void) {
     init_worker_conf conf = config.worker_conf;
     pthread_t* tids = wcalloc(conf.count_worker * sizeof(pthread_t));
 
@@ -308,5 +265,4 @@ int init_workers(void) {
     }
 
     free(tids);
-    return 0;
 }

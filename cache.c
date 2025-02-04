@@ -26,7 +26,7 @@ void free_storage(kv_storage storage);
 cache* c;
 extern config_redis config;
 
-int init_cache(void) {
+void init_cache(void) {
     kv_storage* storage;
 
     c = wcalloc(sizeof(cache));
@@ -42,11 +42,10 @@ int init_cache(void) {
         (storage->kv[i]).lock = wcalloc(sizeof(pthread_spinlock_t));
         err = pthread_spin_init(storage->kv[i].lock, PTHREAD_PROCESS_PRIVATE);
         if (err != 0) {
-            return -1;
+            ereport(INFO, errmsg("init_cache: pthread_spin_lock %s", strerror(err)));
+            abort();
         }
     }
-
-    return 0;
 }
 
 cache_basket* get_basket(char* key, int key_size) {
@@ -90,11 +89,16 @@ void* get_cache(cache_data new_data) {
     return result;
 }
 
-int set_cache(cache_data new_data) {
-    ereport(INFO, errmsg("set_cache: start"));
+void set_cache(cache_data new_data) {
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
+
+    int err = pthread_spin_lock(basket->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("get_cache: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
     cache_data* data = basket->first;
-    ereport(INFO, errmsg("set_cache: basket %p basket->first %p", basket, basket->first));
     while (data != NULL) {
         ereport(INFO, errmsg("set_cache: data %p ", data));
         if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
@@ -134,6 +138,13 @@ int set_cache(cache_data new_data) {
     ereport(INFO, errmsg("set_cache: data %p", data));
 
     ereport(INFO, errmsg("set_cache: finish  0"));
+
+    err = pthread_spin_unlock(basket->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("set_cache: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
+
     return 0;
 }
 

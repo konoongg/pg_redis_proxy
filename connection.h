@@ -26,29 +26,6 @@ void delete_active(connection* conn);
 void delete_wait(connection* conn);
 void free_connection(connection* conn);
 
-// struct db_connect {
-//     int pipe_to_db[2];
-//     bool finish_read;
-// };
-
-// // struct with connect
-// struct socket_data {
-//     socket_write_data* write_data;
-//     socket_read_data* read_data;
-//     struct ev_io* write_io_handle;
-//     struct ev_io* read_io_handle;
-// };
-
-// struct tuple {
-//     int count_attr;
-//     char** attr;
-//     char** attr_name;
-
-//     int* attr_size;
-//     int* attr_name_size;
-// };
-
-
 /* status finish parsing
  * NOT_ALL - Need more data, wait data and reading
  * */
