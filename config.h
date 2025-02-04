@@ -35,7 +35,7 @@ struct cache_conf {
 };
 
 struct db_conn_conf {
-    int count_connection;
+    int count_backend;
     char* dbname;
     char* user;
 };

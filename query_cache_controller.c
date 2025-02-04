@@ -1,7 +1,9 @@
 #include <pthread.h>
 
-#include "query_cache_controller.h"
+#include "alloc.h"
+#include "hash.h"
 #include "db.h"
+#include "query_cache_controller.h"
 
 // int register_command(req_to_db* new_req, db_connect* db_conn) {
 //     if (pthread_mutex_lock(req_wait_plan->lock)) {
@@ -45,7 +47,7 @@
 //     PGresult* res = NULL;
 //     req_to_db* cur_req;
 
-//     init_db();
+//     
 
 //     while(true) {
 
@@ -132,6 +134,16 @@
 //     }
 //     return NULL;
 // }
+
+db_meta* meta;
+
+void* start_db_worker(void*) {
+    init_db();
+    meta = wcalloc(sizeof(db_meta));
+    meta->hash_func =  hash_pow_31_mod_100
+    meta->attrs = wcalloc(HASH_P_31_M_100_SIZE * sizeof());
+    init_meta_db(meta);
+}
 
 void init_db_worker(void) {
     pthread_t db_tid;

@@ -239,7 +239,6 @@ void init_commands(void) {
 
     com_dict->hash_func = hash_pow_31_mod_100;
     com_dict->commands = wcalloc(HASH_P_31_M_100_SIZE * sizeof(entris*));
-    memset(com_dict->commands, 0, HASH_P_31_M_100_SIZE * sizeof(entris*));
 
     for (int i = 0; i < COMMAND_DICT_SIZE; ++i) {
         int hash = com_dict->hash_func(commands[i].name);
