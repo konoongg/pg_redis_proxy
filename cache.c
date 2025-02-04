@@ -28,22 +28,18 @@ extern config_redis config;
 
 int init_cache(void) {
     kv_storage* storage;
-    cache_conf* conf = &config.c_conf;
-    int count_basket = conf->count_basket;
 
     c = wcalloc(sizeof(cache));
     c->storage = wcalloc(sizeof(kv_storage));
     storage = c->storage;
 
-    c->count_basket = count_basket;
-
+    c->count_basket = config.c_conf.count_basket;
     storage->hash_func = murmur_hash_2;
-    storage->kv = wcalloc(count_basket * sizeof(cache_basket));
-    memset(storage->kv, 0, count_basket * sizeof(cache_basket));
+    storage->kv = wcalloc(c->count_basket * sizeof(cache_basket));
 
-    for (int i = 0; i < count_basket; ++i) {
+    for (int i = 0; i < c->count_basket; ++i) {
         int err;
-        storage->kv[i].lock = wcalloc(sizeof(pthread_spinlock_t));
+        (storage->kv[i]).lock = wcalloc(sizeof(pthread_spinlock_t));
         err = pthread_spin_init(storage->kv[i].lock, PTHREAD_PROCESS_PRIVATE);
         if (err != 0) {
             return -1;
@@ -72,13 +68,26 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
 
 void* get_cache(cache_data new_data) {
     cache_basket* basket = get_basket(new_data.key, new_data.key_size);
+    void* result = NULL;
+
+    int err = pthread_spin_lock(basket->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("get_cache: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
 
     cache_data* data = find_data_in_basket(basket, new_data.key, new_data.key_size);
     if (data != NULL) {
-        return data->data;
+        result = data->data;
     }
 
-    return NULL;
+    err = pthread_spin_unlock(basket->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("get_cache: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
+
+    return result;
 }
 
 int set_cache(cache_data new_data) {
@@ -182,10 +191,6 @@ void free_cache(void) {
 int lock_cache_basket(char* key, int key_size) {
     cache_basket* basket = get_basket(key, key_size);
 
-    int err = pthread_spin_lock(basket->lock);
-    if (err != 0) {
-        return -1;
-    }
 
     return 0;
 }

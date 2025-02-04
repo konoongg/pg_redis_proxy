@@ -279,7 +279,7 @@ int init_commands(void) {
 // finds the corresponding function in the dictionary by the command name, and calls it.
 // This implementation allows for quickly
 // finding the function associated with a command in a short amount of time.
-process_result process_command(client_req* req, answer* answ, db_connect* db_conn) {
+process_result process_command(client_req* req, answer* answ) {
     ereport(INFO, errmsg("process_command: start"));
     int hash = com_dict->hash_func(req->argv[0]);
     int size_command_name = strlen(req->argv[0]) + 1;

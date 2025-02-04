@@ -9,7 +9,6 @@
 #include "config.h"
 
 typedef enum data_type data_type;
-typedef enum sub_reason sub_reason;
 typedef struct cache cache;
 typedef struct cache_basket cache_basket;
 typedef struct cache_data cache_data;
@@ -21,23 +20,11 @@ typedef struct pending_list pending_list;
 cache_data create_data(char* key, int key_size, void* data, void (*free_data)(void* data));
 int delete_cache(char* key, int key_size);
 int init_cache(void);
-int lock_cache_basket(char* key, int key_size);
 int set_cache(cache_data new_data);
-int unlock_cache_basket(char* key, int key_size);
 void free_cache(void);
-void notify(char* key, int key_size, char mes);
-void subscribe(char* key, int key_size, sub_reason reason, int notify_fd);
 void* get_cache(cache_data new_data);
 
-struct pending {
-    pending* next;
-    int notify_fd;
-};
-
-struct pending_list {
-    pending* first;
-    pending* last;
-};
+struct 
 
 struct cache_data {
     cache_data* next;
@@ -61,16 +48,8 @@ struct kv_storage {
 };
 
 struct cache {
-    cache_get_result (*get)(cache_data new_data);
-    int (*set)(cache_data new_data);
-    int (*delete)(char* key, int key_size);
     kv_storage* storage;
     int count_basket;
-};
-
-enum sub_reason {
-    WAIT_DATA,
-    WAIT_SYNC,
 };
 
 #endif

@@ -18,7 +18,7 @@ typedef struct tuple_list tuple_list;
 typedef enum data_type data_type;
 
 int init_commands(void);
-process_result process_command(client_req* req, answer* answ, db_connect* db_conn);
+process_result process_command(client_req* req, answer* answ);
 void free_resp_answ(void* ptr);
 void process_err(answer* answ, char* err);
 

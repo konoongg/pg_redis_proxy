@@ -48,13 +48,16 @@ void proxy_start_work(Datum main_arg) {
         abort();
     }
     ereport(INFO, errmsg("finish init commands"));
+
     if (init_cache() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_cache"));
         abort();
     }
     ereport(INFO, errmsg("finish init cache"));
+
     init_db_worker();
     ereport(INFO, errmsg("finish init db worker"));
+
     if (init_workers() != 0) {
         ereport(ERROR, errmsg("proxy_start_work: can't init_workers"));
         abort();

@@ -6,12 +6,15 @@
 
 typedef struct event_loop event_loop;
 
-void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
-void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
+void init_event(void* data, handle* h, int fd);
 void init_loop(wthread* wthrd);
-
+void start_event(event_loop* l, handle* h);
+void stop_event(event_loop* l, handle* h);
+void loop_run(event_loop* l);
+void loop_destroy(event_loop* l);
 struct event_loop {
-    struct ev_loop* loop;
+    void* loop;
+
 };
 
 #endif

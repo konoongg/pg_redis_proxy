@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -19,120 +20,36 @@
 #include "socket_wrapper.h"
 #include "worker.h"
 
-// #define close_with_check(socket_fd) \
-//         if (close(socket_fd) == -1) { \
-//             abort();\
-//         }
+ #define free_answer(answ) \
+    if (answ != NULL) { \
+        free(answ->answer); \
+        free(answ); \
+        answ = NULL; \
+    }
 
-// #define free_answer(answ) \
-//     if (answ != NULL) { \
-//         free(answ->answer); \
-//         free(answ); \
-//         answ = NULL; \
-//     }
+#define free_req(req) \
+    if (req != NULL) { \
+        for (int i = 0; i < req->argc; ++i) { \
+            free(req->argv[i]); \
+        } \
+        free(req->argv); \
+        free(req); \
+        req = NULL; \
+    }
 
-// #define free_req(req) \
-//     if (req != NULL) { \
-//         for (int i = 0; i < req->argc; ++i) { \
-//             free(req->argv[i]); \
-//         } \
-//         free(req->argv); \
-//         free(req); \
-//         req = NULL; \
-//     }
-
-// int init_workers(void);
-// void close_connection(EV_P_ struct ev_io* io_handle);
-// void on_accept_cb(EV_P_ struct ev_io* io_handle, int revents);
-// void on_read_cb(EV_P_ struct ev_io* io_handle, int revents);
-// void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents);
-// void on_write_cb(EV_P_ struct ev_io* io_handle, int revents);
-// void process_req(EV_P_ socket_data* data);
-// void* start_worker(void* argv);
+int init_workers(void);
+proc_status process_accept(connection* conn);
+proc_status process_data(connection* conn);
+proc_status process_read(connection* conn);
+proc_status process_write(connection* conn);
+void finish_connection(connection* conn);
+void* start_worker(void* argv);
 
 extern config_redis config;
 thread_local wthread wthrd;
 
 
-// void close_connection(EV_P_ struct ev_io* io_handle) {
-//     socket_data* data = io_handle->data;
-//     client_req* cur_req;
-//     answer* cur_answer;
-
-//     close_with_check(io_handle->fd);
-
-//     cur_req = data->read_data->reqs->first;
-//     while(cur_req != NULL) {
-//         client_req* req = cur_req->next;
-//         free_req(cur_req);
-//         cur_req = req;
-//     }
-
-//     cur_answer = data->write_data->answers->last;
-//     while(cur_answer != NULL) {
-//         answer* next_answer = cur_answer->next;
-//         free_answer(cur_answer);
-//         cur_answer = next_answer;
-//     }
-
-//     ev_io_stop(loop, data->write_io_handle);
-//     ev_io_stop(loop, data->read_io_handle);
-
-//     free(data->read_data->reqs);
-//     free(data->read_data->parsing.parsing_str);
-//     free(data->read_data->read_buffer);
-//     free(data->read_data);
-//     free(data->write_data);
-//     free(data->read_io_handle);
-//     free(data->write_io_handle);
-//     free(data);
-// }
-
-
 // void on_write_cb(EV_P_ struct ev_io* io_handle, int revents) {
-//     ereport(INFO, errmsg("on_write_cb: start"));
-//     socket_data* data = (socket_data*)io_handle->data;
-//     socket_write_data* w_data = data->write_data;
-//     answer* cur_answer = w_data->answers->first;
-//     ereport(INFO, errmsg("on_write_cb: cur_answer %p cur_answer->answer %p cur_answer->answer_size %d",
-//             cur_answer, cur_answer->answer, cur_answer->answer_size));
-
-//     ereport(INFO, errmsg("on_write_cb: &(cur_answer->answer_size) %p",
-//             &(cur_answer->answer_size)));
-
-//     if (revents & EV_ERROR) {
-//         close_connection(loop, io_handle);
-//         abort();
-//     }
-
-//     ereport(INFO, errmsg("on_write_cb"));
-
-//     while (cur_answer != NULL) {
-//         ereport(INFO, errmsg("on_write_cb: cur_answer->answer %s, cur_answer->answer_size %d",
-//                     cur_answer->answer, cur_answer->answer_size));
-//         int res =  write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
-//         if (res == cur_answer->answer_size) {
-//             answer* next_answer = cur_answer->next;
-//             free_answer(cur_answer);
-//             cur_answer = next_answer;
-//             w_data->answers->last = cur_answer;
-//         } else if (res == -1) {
-//             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-//                 return;
-//             }
-//             close_connection(loop, io_handle);
-//             return;
-//         } else {
-//             cur_answer->answer_size -=  res;
-//             memmove(cur_answer->answer, cur_answer + res, cur_answer->answer_size);
-//             return;
-//         }
-//     }
-//     w_data->answers->first = w_data->answers->last = NULL;
-
-
-//     ev_io_start(loop, data->read_io_handle);
-//     ev_io_stop(loop, io_handle);
 // }
 
 // void on_read_db_cb(EV_P_ struct ev_io* io_handle, int revents) {
@@ -173,78 +90,160 @@ thread_local wthread wthrd;
 //     process_req(loop, data);
 // }
 
-// void process_req(EV_P_ socket_data* data) {
 
-//     ereport(INFO, errmsg("process_req: start"));
-//     socket_read_data* r_data = data->read_data;
-//     socket_write_data* w_data = data->write_data;
-//     client_req* cur_req;
-//     answer* cur_answer;
+void finish_connection(connection* conn) {
+    event_stop(conn->wthrd, conn->r_data->handle);
+    event_stop(conn->wthrd, conn->w_data->handle);
+    free_connection(conn);
+}
 
-//     while (true) {
-//         process_result res;
+proc_status process_write(connection* conn) {
+    write_data* w_data = conn->write_data;
+    answer* cur_answer = w_data->answers->first;
 
-//         cur_req = r_data->reqs->first;
-//         if (cur_req == NULL) {
-//             ereport(INFO, errmsg("process_req: cur_req == NULL"));
-//             ev_io_start(loop, data->write_io_handle);
-//             return;
-//         }
-//         if (w_data->answers->first == NULL) {
-//             w_data->answers->last = w_data->answers->first = wcalloc(sizeof(answer));
-//         } else {
-//             w_data->answers->last->next = wcalloc(sizeof(answer));
-//             w_data->answers->last = w_data->answers->last->next;
-//         }
-//         cur_answer = w_data->answers->last;
-//         ereport(INFO, errmsg("process_req: cur_answer %p cur_answer->answer %p", cur_answer, cur_answer->answer));
-//         res = process_command(cur_req, cur_answer, data->db_conn);
-//         if (res == DONE) {
-//             ereport(INFO, errmsg("process_req: DONE"));
-//             free_req(cur_req);
-//             r_data->reqs->first = r_data->reqs->first->next;
-//         } else if (res == DB_REQ) {
-//             ereport(INFO, errmsg("process_req: DB_REQ data->db_conn->pipe_to_db[0] %d", data->db_conn->pipe_to_db[0]));
+    while (cur_answer != NULL) {
+        int res = write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
+        if (res == cur_answer->answer_size) {
+            answer* next_answer = cur_answer->next;
+            free_answer(cur_answer);
+            cur_answer = next_answer;
+            w_data->answers->last = cur_answer;
+        } else if (res == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return ALIVE_PROC;
+            }
+            finish_connection(conn);
+            return;
+        } else {
+            cur_answer->answer_size -=  res;
+            memmove(cur_answer->answer, cur_answer + res, cur_answer->answer_size);
+            return ALIVE_PROC;
+        }
+    }
+    w_data->answers->first = w_data->answers->last = NULL;
 
-//             ev_io_init(data->read_db_handle, on_read_db_cb, data->db_conn->pipe_to_db[0], EV_READ);
-//             ev_io_start(loop, data->read_db_handle);
-//             return;
-//         } else if  (res == PROCESS_ERR) {
-//             abort();
-//         }
+    start_event(conn->wthrd->l, conn->r_data->handle);
+    stop_event(conn->wthrd->l, conn->w_data->handle);
 
-//         cur_answer = w_data->answers->last;
-//     }
-// }
+    return WAIT_PROC;
+}
 
+proc_status process_data(connection* conn) {
+    read_data* r_data = conn->read_data;
+    write_data* w_data = conn->write_data;
+    client_req* cur_req;
+    answer* cur_answer;
 
-void process_read() {
+     while (true) {
+        process_result res;
+        cur_req = r_data->reqs->first;
+        if (cur_req == NULL) {
+            conn->status = WRITE;
+            conn->proc = process_write;
+            start_event(conn->wthrd->l, conn->w_data->handle);
+            return WAIT_PROC;
+        }
 
+        if (w_data->answers->first == NULL) {
+            w_data->answers->last = w_data->answers->first = wcalloc(sizeof(answer));
+        } else {
+            w_data->answers->last->next = wcalloc(sizeof(answer));
+            w_data->answers->last = w_data->answers->last->next;
+        }
+        cur_answer = w_data->answers->last;
+
+        res = process_command(cur_req, cur_answer);
+        if (res == DONE) {
+            r_data->reqs->first = r_data->reqs->first->next;
+            free_req(cur_req);
+        } else if (res == DB_REQ) {
+            return WAIT_PROC;
+        } else if  (res == PROCESS_ERR) {
+            abort();
+        }
+    }
+}
+
+proc_status notify(connection* conn) {
+    return WAIT_PROC;
+}
+
+proc_status process_read(connection* conn) {
+    exit_status status;
+    int buffer_free_size;
+    int res;
+    read_data* r_data = conn->read_data;
+
+    buffer_free_size = r_data->buffer_size - r_data->cur_buffer_size;
+    res = read(conn->fd, r_data->read_buffer + r_data->cur_buffer_size, buffer_free_size);
+
+    if (res > 0) {
+        r_data->cur_buffer_size = res;
+        status = pars_data(r_data);
+        if (status == ERR) {
+            conn->status = CLOSE;
+            return DEL_PROC;
+        } else if (status == ALL) {
+            while (status == ALL) {
+                status = pars_data(r_data);
+            }
+            stop_event(wthrd->l, r_data->handle);
+            conn->status = PROCESS;
+            conn->proc = process_data;
+            return ALIVE_PROC;
+        } else if (status == NOT_ALL) {
+            return WAIT_PROC;
+        }
+    } else if (res == 0) {
+        conn->status = CLOSE;
+        return DEL_PROC;
+
+    } else if (res < 0) {
+        conn->status = CLOSE;
+        return DEL_PROC;
+    }
+}
+
+proc_status process_accept(connection* conn) {
+    int fd;
+    connection* new_conn;
+
+    fd = accept(wthrd->listen_socket, NULL, NULL);
+    if (socket_fd == -1) {
+        abort();
+    }
+    new_conn = create_connection(fd);
+
+    init_event(conn, r_data->handle, new_conn->fd);
+    init_event(conn, w_data->handle, new_conn->fd);
+    new_conn->wthrd = conn->w_data;
+    new_conn->status = READ;
+    new_conn->proc = process_read;
+    start_event(wthrd->l, r_data->handle);
+    add_wait(new_conn);
+    return WAIT_PROC;
 }
 
 void loop_step(void) {
-    int err = pthread_spin_lock(wthrd.lock);
-    if (err != 0) {
-        ereport(INFO, errmsg("loop_step: pthread_spin_lock() failed: %s\n", strerror(err)));
-	    abort();
-    }
-
-    connection* cur_conn = wthrd.active->first;
-
-    while (cur_conn != NULL) {
-        switch(cur_conn->status) {
-            case READED:
-                process_read();
-                break;
+    while (wthrd.active_size != 0) {
+        connection* cur_conn = wthrd.active->first;
+        while (cur_conn != NULL) {
+            assert(!cur_conn->is_wait);
+            proc_status status = cur_conn->proc(cur_conn);
+            switch(status) {
+                case WAIT_PROC:
+                    delete_active(cur_conn);
+                    add_wait(cur_conn);
+                    break;
+                case DEL_PROC:
+                    delete_active(cur_conn);
+                    finish_connection(cur_conn);
+                    break;
+                case ALIVE_PROC:
+                    break;
+            }
+            cur_conn = cur_conn->next;
         }
-        cur_conn = cur_conn->next;
-    }
-
-
-    err = pthread_spin_unlock(wthrd.lock);
-    if (err != 0) {
-        ereport(INFO, errmsg("loop_step: pthread_spin_unlock() failed: %s\n", strerror(err)));
-	    abort();
     }
 }
 
@@ -253,45 +252,34 @@ void free_wthread(void) {
     close(wthrd.efd);
     free(wthrd.active);
     free(wthrd.wait);
-    ev_loop_destroy(wthrd.l);
-
-    int err = pthread_spin_destroy(&(wthrd.lock));
-    if (err != 0) {
-        ereport(INFO, errmsg("free_wthread: pthread_spin_destroy() failed: %s\n", strerror(err)));
-        abort();
-    }
+    loop_destroy(wthrd.l);
 }
 
 void* start_worker(void* argv) {
     bool run;
+    connection* listen_conn;
 
-    wthrd.listen_socket = init_listen_socket(config.worker_conf.listen_port, config.worker_conf.backlog_size);
-
+    int listen_socket = init_listen_socket(config.worker_conf.listen_port, config.worker_conf.backlog_size);
     if (wthrd.listen_socket == -1) {
         abort();
     }
 
+    listen_conn = create_connection(listen_socket, &wthrd);
     init_loop(&wthrd);
+    listen_conn->status = ACCEPT;
+
     wthrd.active = wcalloc(sizeof(conn_list));
     wthrd.active->first = wthrd.active->last = NULL;
     wthrd.wait = wcalloc(sizeof(conn_list));
-    wthrd.wait->first = wthrd.wait->last = NULL;
+    wthrd.wait->first = wthrd.wait->last = listen_conn;
     wthrd.active_size = 0;
+    wthrd.wait_size = 1;
 
     wthrd.lock = wcalloc(sizeof(pthread_spinlock_t));
-    int err = pthread_spin_init(wthrd.lock, PTHREAD_PROCESS_PRIVATE);
-    if  (err != 0) {
-        ereport(INFO, errmsg("start_worker: pthread_spin_init error %s", strerror(err)));
-        abort();
-    }
 
     while (true) {
         CHECK_FOR_INTERRUPTS();
-        run = ev_run(wthrd.l, EVRUN_ONCE);
-        if (!run) {
-            ereport(INFO, errmsg("start_worker: ev_run return false"));
-            abort();
-        }
+        loop_run(wthrd.l);
         loop_step();
     }
     return NULL;
