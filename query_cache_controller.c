@@ -135,14 +135,32 @@
 //     return NULL;
 // }
 
-db_meta* meta;
+cache_data* init_cache_data(char* key, int key_size, req_table* args) {
+    cache_data* data = wcalloc(sizeof(cache_data));
+    data->key = wcalloc(key_size * sizeof(char));
+    data->key_size = key_size;
+    data->values = wcalloc(sizeof(values));
+    data->values->count_attr = args->count_args;
+    data->values->attr = wcalloc(args->count_args * sizeof(attr));
+    for (int i = 0; i < args->count_args; ++i) {
+        column* c = get_column_info(args->table, args->args[i].column_name);
+        req_column* attr = &(data->values->attr[i]);
+        attr->type = c->type;
+        memcpy(attr->data, args->attr[i].data, args->attr[i].data_size);
+    }
+    return data;
+}
+
+void free_cache_data(cache_data* data) {
+    free(data);
+}
 
 void* start_db_worker(void*) {
     init_db();
-    meta = wcalloc(sizeof(db_meta));
-    meta->hash_func =  hash_pow_31_mod_100
-    meta->attrs = wcalloc(HASH_P_31_M_100_SIZE * sizeof());
-    init_meta_db(meta);
+
+    while (true) {
+
+    }
 }
 
 void init_db_worker(void) {

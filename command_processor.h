@@ -13,9 +13,7 @@ typedef struct command_entry command_entry;
 typedef struct entris entris;
 typedef struct pg_data pg_data;
 typedef struct redis_command redis_command;
-typedef struct tuple tuple;
 typedef struct tuple_list tuple_list;
-typedef enum data_type data_type;
 
 void init_commands(void);
 process_result process_command(client_req* req, answer* answ);

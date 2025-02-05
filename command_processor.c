@@ -8,13 +8,12 @@
 #include "alloc.h"
 #include "cache.h"
 #include "command_processor.h"
-#include "connection.h"
-#include "db.h"
 #include "hash.h"
-#include "pg_req_creater.h"
+#include "query_cache_controller.h"
 #include "resp_creater.h"
 
 extern config_redis config;
+extern default_resp_answer def_resp;
 command_dict* com_dict;
 
 process_result do_del(client_req* req, answer* answ, db_connect* db_conn);
@@ -37,98 +36,67 @@ redis_command commands[] = {
 //     free(data);
 // }
 
-// tuple* create_tuple(char* value, int value_size) {
-//     ereport(INFO, errmsg("create_tuple: start"));
-//     tuple* new_tuple = wcalloc(sizeof(tuple));
-//     int cur_count_attr;
-//     int start_pos;
+req_table* create_req(char* value, int value_size) {
+    req_table* req = wcalloc(sizeof(req_table));
+    int start_pos;
+    int cur_count_attr;
 
-//     new_tuple->count_attr = 1;
-
-//     for (int i = 0; i < value_size; ++i) {
-//         if (value[i] == config.p_conf.delim) {
-//             new_tuple->count_attr++;
-//         }
-//     }
-
-//     new_tuple->attr = wcalloc(new_tuple->count_attr * sizeof(char*));
-//     new_tuple->attr_size = wcalloc(new_tuple->count_attr * sizeof(int));
-
-//     new_tuple->attr_name = wcalloc(new_tuple->count_attr * sizeof(char*));
-//     new_tuple->attr_name_size = wcalloc(new_tuple->count_attr * sizeof(int));
-
-//     start_pos = 0;
-//     cur_count_attr = 0;
-//     for (int cur_pos = 0; cur_pos < value_size + 1; ++cur_pos) {
-//         if (value[cur_pos] == config.p_conf.delim || value[cur_pos] == '\0') {
-//             int index_delim;
-//             int attr_name_size;
-//             int attr_size;
-
-//             for (index_delim = start_pos; index_delim < cur_pos; ++index_delim) {
-//                 if (value[index_delim] == ':') {
-//                     break;
-//                 }
-//             }
-
-//             attr_name_size = index_delim - start_pos;
-//             attr_size = cur_pos - index_delim - 1;
-
-//             new_tuple->attr[cur_count_attr] = wcalloc(attr_size  * sizeof(char));
-//             new_tuple->attr_name[cur_count_attr] = wcalloc(attr_name_size  * sizeof(char));
-
-//             memcpy(new_tuple->attr_name[cur_count_attr], value + start_pos, attr_name_size);
-//             memcpy(new_tuple->attr[cur_count_attr], value + index_delim + 1, attr_size);
-//             new_tuple->attr_name_size[cur_count_attr] = attr_name_size;
-//             new_tuple->attr_size[cur_count_attr] = attr_size;
-//             cur_count_attr++;
-//             start_pos = cur_pos + 1;
-//         }
-//     }
-//     return new_tuple;
-// }
-
-// void free_tuple(tuple* tpl) {
-//     free(tpl->attr_size);
-//     free(tpl->attr_name_size);
-//     for (int i = 0; i < tpl->count_attr; ++i) {
-//         free(tpl->attr_name[i]);
-//         free(tpl->attr[i]);
-//     }
-//     free(tpl->attr);
-//     free(tpl->attr_name);
-//     free(tpl);
-// }
-
-process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
-    ereport(INFO, errmsg("do_get: start %d ", req->argc));
-    answer* res;
-    if (lock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
-        create_err_resp(answ, "ERR syntax error");
-        return PROCESS_ERR;
+    req->count_args = 1;
+    for (int i = 0; i < value_size; ++i) {
+        if (value[i] == config.p_conf.delim) {
+            req->count_attr++;
+        }
     }
 
-    res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
+    req->columns = wcalloc(req->count_attr * sizeof(req_column));
+
+    start_pos = 0;
+    cur_count_attr = 0;
+    for (int cur_pos = 0; cur_pos < value_size + 1; ++cur_pos) {
+        if (value[cur_pos] == config.p_conf.delim || value[cur_pos] == '\0') {
+            int index_delim;
+            int attr_name_size;
+            int attr_size;
+
+            for (index_delim = start_pos; index_delim < cur_pos; ++index_delim) {
+                if (value[index_delim] == ':') {
+                    break;
+                }
+            }
+
+            attr_name_size = index_delim - start_pos;
+            attr_size = cur_pos - index_delim - 1;
+
+            req->columns[cur_count_attr].column_name = wcalloc(attr_name_size  * sizeof(char));
+            req->columns[cur_count_attr].data = wcalloc( attr_size * sizeof(char));
+
+            memcpy(req->columns[cur_count_attr].column_name, value + start_pos, attr_name_size);
+            memcpy(req->columns[cur_count_attr].column, value + index_delim + 1, attr_size);
+            req->columns[cur_count_attr].data_size = attr_size;
+            cur_count_attr++;
+            start_pos = cur_pos + 1;
+        }
+    }
+    return req;
+}
+
+void free_req(req_table* req) {
+    for (int i = 0; i < req->count_args; ++i) {
+        free(req->columns[i].data);
+    }
+    free(req->columns);
+    free(req);
+}
+
+process_result do_get(client_req* req, answer* answ) {
+    values* res = get_cache(req->argv[1], req->argv_size[1]);
 
     if (res == NULL) {
-        int notify_fd = register_command(create_pg_get(req, answ), db_conn);
-        if (notify_fd == -1) {
-            return PROCESS_ERR;
-        }
-        ereport(INFO, errmsg("do_get: start sub"));
-        subscribe(req->argv[1], req->argv_size[1], WAIT_DATA, notify_fd);
-        ereport(INFO, errmsg("do_get: finish sub"));
-
-        if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
-            create_err_resp(answ, "ERR syntax error");
-            return PROCESS_ERR;
-        }
+        register_command();
         return DB_REQ;
     }
 
-    answ->answer = wcalloc(res->answer_size * sizeof(char));
-    memcpy(answ->answer, res->answer, res->answer_size);
-    answ->answer_size = res->answer_size;
+    create_array_resp(answ);
 
     if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");
@@ -138,88 +106,28 @@ process_result do_get(client_req* req, answer* answ, db_connect* db_conn) {
 }
 
 process_result do_set(client_req* req, answer* answ) {
-    answer* cache_res;
-    answer* new_answer = wcalloc(sizeof(answer));
-    int  set_res = 0;
-    process_result proccess_res;
+    req_table* new_req = create_req(req->argv[2], req->argv_size[2]);
+    cache_data* data = init_cache_data(req->argv[1], req->argv_size[1], new_req);
+    set_cache(data);
+    free_cache_data(data);
+    free_req(req);
 
-    tuple* new_tuple = create_tuple(req->argv[2], req->argv_size[2]);
+    answ->answer_size = def_resp.ok.answer_size;
+    answ->answer = mcalloc(answ->answer_size  * sizeof(char));
+    memcpe(answ->answer, def_resp.ok.answer, answ->answer_size);
 
-    answer* new_resp_array = wcalloc(sizeof(answer));
-    create_array_bulk_string_resp(new_resp_array, new_tuple->count_attr, new_tuple->attr, new_tuple->attr_size) ;
-
-
-    cache_res = get_cache(create_data(req->argv[1], req->argv_size[1], NULL, NULL));
-
-    if (cache_res == NULL) {
-
-        ereport(INFO, errmsg("do_set: cache_res == NULL"));
-        init_array_by_elem(new_answer, 1, new_resp_array);
-    } else {
-        ereport(INFO, errmsg("do_set: cache_res != NULL"));
-        int array_size = get_array_size(cache_res);
-        init_array_by_elem(new_answer, array_size, new_resp_array);
-    }
-
-    set_res = set_cache(create_data(req->argv[1], req->argv_size[1], new_answer, free_resp_answ));
-
-    create_simple_string_resp(answ, "OK");
-
-    if (set_res  == -1 ) {
-        abort();
-    }
-
-    if (config.c_conf.mode == NO_SYNC) {;
-        proccess_res = DONE;
-    } else {
-        int notify_fd = register_command(create_pg_set(req, new_tuple), db_conn);
-        if (notify_fd == -1) {
-            proccess_res = PROCESS_ERR;
-        }
-        subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
-        proccess_res = DB_REQ;
-    }
-
-    free_tuple(new_tuple);
-    return proccess_res;
+    return DB_REQ;
 }
 
-process_result do_del(client_req* req, answer* answ, db_connect* db_conn) {
+process_result do_del(client_req* req, answer* answ) {
     int count_del = 0;
-    process_result process_res = NONE;
-    ereport(INFO, errmsg("do_del: start %d ", req->argc));
     for (int i = 1; i < req->argc; ++i) {
-
-        ereport(INFO, errmsg("do_del: try lock"));
-        if (lock_cache_basket(req->argv[i], req->argv_size[i]) != 0) {
-            create_err_resp(answ, "ERR syntax error");
-            return PROCESS_ERR;
-        }
-
-        ereport(INFO, errmsg("do_del: suc lock"));
         count_del += delete_cache(req->argv[i], req->argv_size[i]);
-
-        if (unlock_cache_basket(req->argv[i], req->argv_size[i]) != 0) {
-            create_err_resp(answ, "ERR syntax error");
-            return PROCESS_ERR;
-        }
-        ereport(INFO, errmsg("do_del: unlock"));
     }
 
-    if (config.c_conf.mode == NO_SYNC) {
-        process_res =  DONE;
-    } else if (config.c_conf.mode == ALL_SYNC) {
-        int notify_fd = register_command(create_pg_del(req), db_conn);
-        if (notify_fd == -1) {
-            process_res =  PROCESS_ERR;
-        } else {
-            subscribe(req->argv[1], req->argv_size[1], WAIT_SYNC, notify_fd);
-            process_res =  DB_REQ;
-        }
-    }
-    ereport(INFO, errmsg("do_del: count_del %d", count_del));
+    register_command();
     create_num_resp(answ, count_del);
-    return process_res;
+    return DB_REQ;
 }
 
 void free_command(int hash) {

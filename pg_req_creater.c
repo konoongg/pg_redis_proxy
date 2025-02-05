@@ -14,6 +14,7 @@
 
 extern config_redis config;
 
+
 void init_attribute(table_attribute* attr, char* key, int key_size);
 void free_attr(table_attribute* attr);
 char* create_columns_name(tuple* new_tuple, int* returned_size);

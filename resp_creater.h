@@ -19,6 +19,7 @@ typedef struct resp_bulk_string_arg resp_bulk_string_arg;
 typedef struct resp_array_arg resp_array_arg;
 typedef struct resp_int_arg resp_int_arg;
 typedef union generic_resp_arg generic_resp_arg;
+typedef struct default_resp_answer default_resp_answer;
 
 int get_array_size(answer* answ);
 void create_array_bulk_string_resp(answer* answ, int count_attr, char** attr, int* size_attr);
@@ -60,6 +61,10 @@ union generic_resp_arg {
     resp_int_arg int_arg;
     resp_bulk_string_arg bulk_string_arg;
     resp_string_arg string_arg;
+};
+
+struct default_resp_answer {
+    answer ok;
 };
 
 #endif

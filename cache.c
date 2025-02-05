@@ -15,7 +15,6 @@
 #include "alloc.h"
 #include "cache.h"
 #include "config.h"
-#include "error_mes.h"
 #include "hash.h"
 #include "strings.h"
 
@@ -25,6 +24,19 @@ void free_storage(kv_storage storage);
 
 cache* c;
 extern config_redis config;
+
+void free_data_from_cache(cache_data* data);
+
+void free_data_from_cache(cache_data* data) {
+    for (int i = 0; i < data->values->count_attr; ++i) {
+        free(data->values->attr->data);
+        free(data->values->attr);
+    }
+
+    free(data->values);
+    free(data->key);
+    free(data);
+}
 
 void init_cache(void) {
     kv_storage* storage;
@@ -65,9 +77,10 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     return NULL;
 }
 
-void* get_cache(cache_data new_data) {
-    cache_basket* basket = get_basket(new_data.key, new_data.key_size);
-    void* result = NULL;
+values* get_cache(char* key, int key_size) {
+    cache_basket* basket = get_basket(key, key_size);
+    cache_data* data
+    values* result = NULL;
 
     int err = pthread_spin_lock(basket->lock);
     if (err != 0) {
@@ -75,9 +88,9 @@ void* get_cache(cache_data new_data) {
         abort();
     }
 
-    cache_data* data = find_data_in_basket(basket, new_data.key, new_data.key_size);
+    data = find_data_in_basket(basket, new_data.key, new_data.key_size);
     if (data != NULL) {
-        result = data->data;
+        result = data->values;
     }
 
     err = pthread_spin_unlock(basket->lock);
@@ -89,8 +102,9 @@ void* get_cache(cache_data new_data) {
     return result;
 }
 
-void set_cache(cache_data new_data) {
-    cache_basket* basket = get_basket(new_data.key, new_data.key_size);
+void set_cache(cache_data* new_data) {
+    cache_basket* basket = get_basket(new_data->key, new_data->key_size);
+    cache_data* data;
 
     int err = pthread_spin_lock(basket->lock);
     if (err != 0) {
@@ -98,46 +112,31 @@ void set_cache(cache_data new_data) {
         abort();
     }
 
-    cache_data* data = basket->first;
-    while (data != NULL) {
-        ereport(INFO, errmsg("set_cache: data %p ", data));
-        if (memcmp(data->key, new_data.key, new_data.key_size) == 0 && data->key_size == new_data.key_size) {
-            break;
+    data = find_data_in_basket(basket, new_data->key, new_data->key_size);
+    if (data == NULL) {
+        if (basket->first == NULL) {
+            data = basket->first = basket->last = wcalloc(sizeof(cache_data));
+        } else {
+            basket->last->next = wcalloc(sizeof(cache_data));
+            data = basket->last = basket->last->next
         }
-        data = data->next;
+        data->next = NULL;
+        data->key_size = new_data->key_size;
+        data->key = new_data->key;
+        data->values = new_data->values;
+    } else {
+        for (int i = 0; i < data->count_attr; ++i) {
+            free(data->values->values[i].data);
+        }
+        free(data->values);
+        data->values = new_data->values;
     }
 
-    if (data == NULL) {
-        ereport(INFO, errmsg("set_cache: data == NULL"));
-        data = wcalloc(sizeof(cache_data));
-        memset(data, 0, sizeof(cache_data));
-
-        if (basket->first == NULL) {
-            basket->first = basket->last = data;
-        } else {
-            basket->last->next = data;
-            basket->last = basket->last->next;
-        }
-
-        data->pend_list = wcalloc(sizeof(pending_list));
-        data->key = wcalloc(new_data.key_size * sizeof(char*));
-        data->next = NULL;
-        memcpy(data->key, new_data.key, new_data.key_size);
-        data->key_size = new_data.key_size;
-        ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
-    } else { ereport(INFO, errmsg("set_cache: data != NULL")); }
-    data->free_data = new_data.free_data;
-=    ereport(INFO, errmsg("set_cache: data %p data->free_data %p", data, data->free_data));
     data->last_time = time(NULL);
     if (data->last_time == -1) {
         ereport(INFO, errmsg("set_cache: finish  1"));
         return -1;
     }
-
-    data->data = new_data.data;
-    ereport(INFO, errmsg("set_cache: data %p", data));
-
-    ereport(INFO, errmsg("set_cache: finish  0"));
 
     err = pthread_spin_unlock(basket->lock);
     if (err != 0) {
@@ -149,13 +148,17 @@ void set_cache(cache_data new_data) {
 }
 
 int delete_cache(char* key, int key_size) {
-    ereport(INFO, errmsg("delete_cache: start"));
     cache_basket* basket = get_basket(key, key_size);
+
+    int err = pthread_spin_lock(basket->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("delete_cache: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
 
     cache_data* data = basket->first;
     cache_data* prev_data = NULL;
     while (data != NULL) {
-        ereport(INFO, errmsg("delete_cache: data %p prev_data %p", data, prev_data));
         if (memcmp(data->key, key, key_size) == 0 && data->key_size == key_size) {
             break;
         }
@@ -164,14 +167,10 @@ int delete_cache(char* key, int key_size) {
     }
 
     if (data == NULL) {
-        ereport(INFO, errmsg("delete_cache: data == NULL"));
         return 0;
     } else if (data == basket->first) {
-        ereport(INFO, errmsg("delete_cache: data is first"));
         basket->first = data->next;
-        ereport(INFO, errmsg("delete_cache: basket %p basket->first %p", basket, basket->first));
     } else {
-        ereport(INFO, errmsg("delete_cache: data is NOT first prev_data %p data->next %p", prev_data, data->next));
         prev_data->next = data->next;
     }
 
@@ -179,8 +178,14 @@ int delete_cache(char* key, int key_size) {
         basket->last = prev_data;
     }
 
-    data->free_data(data->data);
-    free(data);
+    free_data_from_cache(data);
+
+    err = pthread_spin_lock(basket->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("delete_cache: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
     return 1;
 }
 
@@ -217,78 +222,9 @@ int unlock_cache_basket(char* key, int key_size) {
     return 0;
 }
 
-cache_data create_data(char* key, int key_size, void* data, void (*free_data)(void* data)) {
-    cache_data new_data;
-    memset(&new_data, 0, sizeof(new_data));
-    new_data.key_size = key_size;
-    new_data.key = key;
-    new_data.free_data = free_data;
-    new_data.data = data;
-    return new_data;
-}
-
-void subscribe(char* key, int key_size, sub_reason reason, int notify_fd) {
-    cache_basket* basket = get_basket(key, key_size);
-
-    ereport(INFO, errmsg("subscribe: notify_fd %d ", notify_fd));
-
-    cache_data* data = find_data_in_basket(basket, key, key_size);
-    if (data == NULL) {
-        ereport(INFO, errmsg("subscribe: data is NULL "));
-        if (basket->first == NULL) {
-            basket->first = basket->last = wcalloc(sizeof(cache_data));
-        } else {
-            basket->last->next = wcalloc(sizeof(cache_data));
-            basket->last = basket->last->next;
-        }
-        basket->last->key = wcalloc(key_size * sizeof(char));
-        basket->last->pend_list = wcalloc(sizeof(pending_list));
-        memcpy(basket->last->key, key, key_size);
-        basket->last->key_size = key_size;
-        basket->last->next = NULL;
-        data = basket->last;
-    }
-
-    ereport(INFO, errmsg("subscribe: data %p", data));
-
-    if (data->pend_list->first == NULL) {
-            data->pend_list->first = data->pend_list->last = wcalloc(sizeof(pending));
-    } else {
-        data->pend_list->last->next = wcalloc(sizeof(pending));
-        data->pend_list->last = data->pend_list->last->next;
-    }
-    data->pend_list->last->next = NULL;
-    data->pend_list->last->notify_fd = notify_fd;
-    ereport(INFO, errmsg("subscribe: data->pend_list %p", data->pend_list));
-
-    ereport(INFO, errmsg("subscribe: data->pend_list->last %p", data->pend_list->last));
-    ereport(INFO, errmsg("subscribe: basket %p basket->first  %p ", basket, basket->first));
-}
-
-void notify(char* key, int key_size, char mes) {
-    cache_basket* basket = get_basket(key, key_size);
-    cache_data* data = find_data_in_basket(basket, key, key_size);
-
-    ereport(INFO, errmsg("notify: data %p", data));
-    if (data != NULL) {
-        pending* cur_pend = data->pend_list->first;
-        ereport(INFO, errmsg("notify: data->pend_list->first %p", data->pend_list->first));
-        while (cur_pend != NULL) {
-            ereport(INFO, errmsg("notify: cur_pend %p", cur_pend));
-            pending* next_pend = cur_pend->next;
-
-            ereport(INFO, errmsg("notify:cur_pend->notify_fd %d", cur_pend->notify_fd));
-            int err = write(cur_pend->notify_fd, &mes, 1);
-            if (err == -1) {
-                char* err_msg = strerror(errno);
-                ereport(INFO, errmsg("notify: error %s", err_msg));
-                abort();
-            }
-            close(cur_pend->notify_fd);
-            free(cur_pend);
-            cur_pend = next_pend;
-        }
-        data->pend_list->first = data->pend_list->last = NULL;
-        ereport(INFO, errmsg("notify: basket %p basket->first  %p ", basket, basket->first));
-    }
+cache_data* create_cache_data(char* key, int key_size) {
+    cache_data data = wcalloc(sizeof(cache_data));
+    data.key = wcalloc(key_size * sizeof(char));
+    data.key_size = key_size;
+    data.values = wcalloc();
 }

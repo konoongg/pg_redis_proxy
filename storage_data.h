@@ -1,31 +1,56 @@
 #ifndef STORAGE_DATA_H
 #define STORAGE_DATA_H
 
-// typedef enum db_type db_type;
+typedef enum db_type db_type;
+typedef struct attr attr;
+typedef struct cache_data cache_data;
+typedef struct column column;
+typedef struct table table;
+typedef struct values values;
 
-// enum db_type {
-//     BOOL,
-//     DOUBLE,
-//     INT,
-//     STRING,
-// };
+enum db_type {
+    BOOL,
+    DOUBLE,
+    INT,
+    STRING,
+    NON,
+};
 
-// //table.column
-// struct attr {
-//     attr* next;
-//     char* attr_name;
-//     int attr_size;
-//     db_type type;
-// };
+struct column {
+    db_type type;
+    bool is_nullable;
+    char* column_name;
+};
 
-// struct attr_basket {
-//     attr* first;
-//     attr* last;
-// };
+struct table {
+    int count_column;
+    column* columns;
+    char* name;
+};
 
-// struct db_meta {
-//     attr_basket* attrs;
-//     int (*hash_func)(char* key);
-// };
+struct db_meta_data {
+    table* tables;
+    int count_tables;
+};
+
+
+struct values {
+    int count_attr;
+    attr* attr;
+};
+
+struct attr {
+    void* data;
+    db_type type;
+    bool is_nullable;
+}
+
+struct cache_data {
+    values* values;
+    cache_data* next;
+    char* key;
+    int key_size;
+    time_t last_time;
+};
 
 #endif

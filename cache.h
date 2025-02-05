@@ -1,51 +1,26 @@
 #ifndef CACHE_H
 #define CACHE_H
 
+
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
 
 #include "config.h"
+#include "storage_data.h"
 
-typedef enum data_type data_type;
-typedef struct data data;
 typedef struct cache cache;
 typedef struct cache_basket cache_basket;
-typedef struct cache_data cache_data;
 typedef struct cache_get_result cache_get_result;
+typedef struct data data;
 typedef struct kv_storage kv_storage;
 
 int delete_cache(char* key, int key_size);
-int set_cache(cache_data new_data);
+void set_cache(cache_data* new_data)
 void free_cache(void);
 void init_cache(void);
-void* get_cache(cache_data new_data);
-
-struct string {
-    char* str;
-    int str_size;
-};
-
-enum data_type {
-    INT,
-    STRING,
-};
-
-struct data {
-    data_type type;
-    data* next;
-    void* data;
-};
-
-struct cache_data {
-    int count_attr;
-    data* d;
-    cache_data* next;
-    char* key;
-    int key_size;
-    time_t last_time;
-};
+values* get_cache(char* key, int key_size);
 
 struct cache_basket {
     cache_data* first;

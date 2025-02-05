@@ -12,25 +12,8 @@
 typedef struct column column;
 typedef struct table table;
 typedef struct db_meta_data db_meta_data;
+
 void init_db();
-void init_meta_db(db_meta* meta);
-
-
-struct column {
-    data_type type;
-    bool is_nullable;
-    char* column_name;
-};
-
-struct table {
-    int count_column;
-    column* columns;
-    char* name;
-};
-
-struct db_meta_data {
-    table* tables;
-    int count_tables;
-};
+column* get_column_info(char* table_name, char* column_name);
 
 #endif

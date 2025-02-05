@@ -38,6 +38,21 @@ void connect_to_db() {
 
 }
 
+column* get_column_info(char* table_name, char* column_name) {
+    for (int i = 0; i < meta->count_tables; ++i) {
+        table* t  = &(meta->tables[i]);
+        if (strncmp(t->name, table_name, strlen(table_name)) == 0 && strlen(table_name) == strlen(t->name)) {
+            for (int j = 0; j < t->count_column; ++j) {
+                column* c = &(t->columns[j]);
+                if (strncmp(c->name, column_name, strlen(column_name)) == 0 && strlen(column_name) == strlen(c->name)) {
+                    return c
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
 void init_meta_data() {
     meta = wcalloc(sizeof(db_meta_data));
     const char* query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public';";
@@ -79,13 +94,6 @@ void init_meta_data() {
 
         t->count_column = PQnfields(res);
         t->columns = wcalloc(t->count_column * sizeof(column));
-
-        for (int column = 0; column < t->count_column; ++column ) {
-            if (strncmp("column_name", PQfname(0, ste)) == 0) {
-
-            }
-        }
-
     }
 }
 
