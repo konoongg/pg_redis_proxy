@@ -1,7 +1,9 @@
 #include <assert.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <threads.h>
 
@@ -122,6 +124,17 @@ proc_status process_data(connection* conn) {
 }
 
 proc_status notify(connection* conn) {
+    char code;
+    int res = read(conn->fd, &code, 1);
+
+    if (res < 0 && res != EAGAIN) {
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("notify: read error %s", err));
+        abort();
+    } else if (res == 0 || res == EAGAIN) {
+        return ALIVE_PROC;
+    }
+
     return WAIT_PROC;
 }
 
@@ -166,18 +179,19 @@ proc_status process_accept(connection* conn) {
     connection* new_conn;
 
     fd = accept(wthrd->listen_socket, NULL, NULL);
-    if (socket_fd == -1) {
+    if (fd == -1) {
         abort();
     }
-    new_conn = create_connection(fd);
+    new_conn = create_connection(fd, &wthrd);
+    add_wait(new_conn);
 
-    init_event(conn, r_data->handle, new_conn->fd);
-    init_event(conn, w_data->handle, new_conn->fd);
-    new_conn->wthrd = conn->w_data;
+    init_event(new_conn, new_conn->r_data->handle, new_conn->fd, EVENT_READ);
+    init_event(new_conn, new_conn->w_data->handle, new_conn->fd, EVENT_WRITE);
+
     new_conn->status = READ;
     new_conn->proc = process_read;
+
     start_event(wthrd->l, r_data->handle);
-    add_wait(new_conn);
     return WAIT_PROC;
 }
 
@@ -215,24 +229,47 @@ void free_wthread(void) {
 void* start_worker(void* argv) {
     bool run;
     connection* listen_conn;
+    connection* efd_conn;
+
 
     int listen_socket = init_listen_socket(config.worker_conf.listen_port, config.worker_conf.backlog_size);
     if (wthrd.listen_socket == -1) {
         abort();
     }
 
-    listen_conn = create_connection(listen_socket, &wthrd);
+
     init_loop(&wthrd);
-    listen_conn->status = ACCEPT;
+
+    init_event(listen_conn, listen_conn->r_data->handle, listen_conn->fd, EVENT_READ);
+
 
     wthrd.active = wcalloc(sizeof(conn_list));
     wthrd.active->first = wthrd.active->last = NULL;
-    wthrd.wait = wcalloc(sizeof(conn_list));
-    wthrd.wait->first = wthrd.wait->last = listen_conn;
     wthrd.active_size = 0;
-    wthrd.wait_size = 1;
+    wthrd.wait = wcalloc(sizeof(conn_list));
+    wthrd.wait->first = wthrd.wait->last = NULL;
+    wthrd.wait_size = 0;
 
-    wthrd.lock = wcalloc(sizeof(pthread_spinlock_t));
+    listen_conn = create_connection(listen_socket, &wthrd);
+    add_wait(listen_conn);
+    listen_conn->proc = process_accept;
+    listen_conn->status = ACCEPT;
+
+    start_event(wthrd->l, listen_conn->r_data->handle);
+
+    wthrd.efd = eventfd(0, EFD_NONBLOCK);
+    if (wthrd.efd == -1) {
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("start_worker: eventfd error %s", err));
+        abort();
+    }
+
+    efd_conn = create_connection(wthrd.efd, &wthrd);
+    add_wait(efd_conn);
+    listen_conn->proc = notify;
+    listen_conn->status = NOTIFY;
+
+    start_event(wthrd->l, efd_conn->r_data->handle);
 
     while (true) {
         CHECK_FOR_INTERRUPTS();

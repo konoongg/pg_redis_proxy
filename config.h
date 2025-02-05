@@ -28,10 +28,10 @@ enum cache_mode {
 };
 
 struct cache_conf {
-    int databases;
-    maxmemory_policy mm_policy;
     int count_basket;
-    cache_mode mode;
+    int databases;
+    int ttl_s;
+    maxmemory_policy mm_policy;
 };
 
 struct db_conn_conf {

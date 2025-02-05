@@ -19,22 +19,12 @@ command_dict* com_dict;
 process_result do_del(client_req* req, answer* answ, db_connect* db_conn);
 process_result do_get(client_req* req, answer* answ, db_connect* db_conn);
 process_result do_set(client_req* req, answer* answ, db_connect* db_conn);
-// tuple* create_tuple(char* value, int value_size);
-// void free_tuple(tuple* tpl);
 
-// This is a dictionary that establishes a correspondence between a command name
-// and the function that should be called as a callback when that command is received.
 redis_command commands[] = {
     {"del", do_del},
     {"get", do_get},
     {"set", do_set},
 };
-
-// void free_resp_answ(void* ptr) {
-//     answer* data = (answer*)ptr;
-//     free(data->answer);
-//     free(data);
-// }
 
 req_table* create_req(char* value, int value_size) {
     req_table* req = wcalloc(sizeof(req_table));
@@ -96,7 +86,7 @@ process_result do_get(client_req* req, answer* answ) {
         return DB_REQ;
     }
 
-    create_array_resp(answ);
+    create_array_resp(res, answ);
 
     if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
         create_err_resp(answ, "ERR syntax error");

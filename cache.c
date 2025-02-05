@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,16 +17,18 @@
 #include "cache.h"
 #include "config.h"
 #include "hash.h"
-#include "strings.h"
+#include "storage_data.h"
 
+bool check_ttl(cache_data* data);
 cache_basket* get_basket(char* key, int key_size);
 cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size);
 void free_storage(kv_storage storage);
+void free_data_from_cache(cache_data* data);
 
 cache* c;
 extern config_redis config;
 
-void free_data_from_cache(cache_data* data);
+
 
 void free_data_from_cache(cache_data* data) {
     for (int i = 0; i < data->values->count_attr; ++i) {
@@ -77,6 +80,27 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     return NULL;
 }
 
+bool check_ttl(cache_data* data) {
+    if (config.c_conf.ttl_s == 0 ) {
+        return true;
+    }
+
+    time_t cur_time = time(NULL);
+    if (cur_time == -1) {
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("get_cache: time error  %s", err));
+        abort();
+    }
+
+    if (cur_time - data->last_time > config.c_conf.ttl_s ) {
+        free_data_from_cache(data);
+        return false;
+    }
+
+    data->last_time = cur_time;
+    return true;
+}
+
 values* get_cache(char* key, int key_size) {
     cache_basket* basket = get_basket(key, key_size);
     cache_data* data
@@ -89,7 +113,7 @@ values* get_cache(char* key, int key_size) {
     }
 
     data = find_data_in_basket(basket, new_data.key, new_data.key_size);
-    if (data != NULL) {
+    if (data != NULL && check_ttl(data->last_time)) {
         result = data->values;
     }
 
@@ -134,8 +158,9 @@ void set_cache(cache_data* new_data) {
 
     data->last_time = time(NULL);
     if (data->last_time == -1) {
-        ereport(INFO, errmsg("set_cache: finish  1"));
-        return -1;
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("set_cache: time error  %s", err));
+        abort();
     }
 
     err = pthread_spin_unlock(basket->lock);

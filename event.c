@@ -15,9 +15,16 @@ extern config_redis config;
 
 void callback(EV_P_ struct ev_io* io_handle, int revents);
 
-void init_event(void* data, handle* h, int fd, int flag) {
+void init_event(void* data, handle* h, int fd, event_mode mode) {
+    int flag;
+    if (mode == EVENT_READ) {
+        flag = EV_READ;
+    } else if (mode == EVENT_WRITE) {
+        flag = EV_WRITE;
+    }
+
     h->handle = (struct ev_io*)wcalloc(sizeof(struct ev_io));
-    ev_io_init((struct ev_io*)h->handle, callback, fd, EV_READ);
+    ev_io_init((struct ev_io*)h->handle, callback, fd, flag);
     ((struct ev_io*)(h->handle))->data = data;
 }
 

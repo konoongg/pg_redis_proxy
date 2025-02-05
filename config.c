@@ -11,7 +11,7 @@ void defalt_setting_init(void) {
     config.c_conf.count_basket = 100000;
     config.c_conf.databases = 16;
     config.c_conf.mm_policy = noeviction;
-    config.c_conf.mode = ALL_SYNC;
+    config.c_conf.ttl_s = 5;
 
     config.worker_conf.backlog_size = 512;
     config.worker_conf.buffer_size = 512;

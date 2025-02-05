@@ -4,9 +4,15 @@
 #include "connection.h"
 #include "ev.h"
 
+typedef enum event_mode event_mode;
 typedef struct event_loop event_loop;
 
-void init_event(void* data, handle* h, int fd);
+enum event_mode {
+    EVENT_READ,
+    EVENT_WRITE,
+};
+
+void init_event(void* data, handle* h, int fd, event_mode flag);
 void init_loop(wthread* wthrd);
 void start_event(event_loop* l, handle* h);
 void stop_event(event_loop* l, handle* h);

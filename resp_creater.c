@@ -9,6 +9,7 @@
 #include "alloc.h"
 #include "connection.h"
 #include "resp_creater.h"
+#include "storage_data.h"
 
 const char crlf[] = "\r\n";
 
@@ -90,107 +91,41 @@ void create_bulk_string_resp(answer* answ, char* src, int size) {
     memcpy(answ->answer + index, crlf, 2);
 }
 
-void create_array_bulk_string_resp(answer* answ, int count_attr, char** attr, int* size_attr) {
-    answer** sub_answers = wcalloc(count_attr * sizeof(answer*));
-    int answer_size;
+void create_array_resp(answer* answ, values* res) {
     int index = 0;
-    char str_size[MAX_STR_NUM_SIZE];
+    char str_size_array[MAX_STR_NUM_SIZE];
+    snprintf(str_size_array, MAX_STR_NUM_SIZE, "%d", res->count_attr);
 
-    snprintf(str_size, MAX_STR_NUM_SIZE, "%d", count_attr); // *<integer>\r\n
+    int answ_size = strlen(str_size_array) + 1 + 2; //*<size>\r\n
+    answer* sub_answers = wcalloc(res->count_attr * sizeof(sub_answers));
 
-    answer_size = 1  + strlen(str_size) + 2;
-    for (int i = 0; i < count_attr; ++i) {
-        sub_answers[i] = wcalloc(sizeof(answer));
-        create_bulk_string_resp(sub_answers[i], attr[i], size_attr[i]);
-        answer_size += sub_answers[i]->answer_size;
+    for (int i = 0; i < res->count_attr; ++i) {
+        attr* a = &(res->attr[i]);
+        switch (a->type) {
+            case INT:
+                create_num_resp(&sub_answers[i], a->data->num);
+                break;
+            case STRING:
+                create_bulk_string_resp(&sub_answers[i], a->data->str.str, a->data->str.size);
+                break;
+        }
+        answ_size +=sub_answers[i].answer_size;
     }
+    answ->answer_size = answ_size;
+    answ->answer = wcalloc(answ_size * sizeof(char));
 
-    answ->answer = wcalloc(answer_size * sizeof(char));
-    answ->answer_size = answer_size;
-
-    answ->answer[index] = '*';
+    answ->answer[0] = '*';
     index++;
-    memcpy(answ->answer + index, str_size, strlen(str_size));
-    index += strlen(str_size);
+
+    memcpy(answ->answer + index, str_size_array, strlen(str_size_array));
+    index += strlen(str_size_array);
     memcpy(answ->answer + index, crlf, 2);
     index += 2;
 
-    for (int i = 0; i < count_attr; ++i) {
-        memcpy(answ->answer + index, sub_answers[i]->answer, sub_answers[i]->answer_size);
-        index += sub_answers[i]->answer_size;
+    for (int i = 0; i < res->count_attr; ++i) {
+        memcpy(answ->answer + index, sub_answers[i].answer, sub_answers[i].answer_size);
+        index += sub_answers[i].answer_size;
+        free(sub_answers[i].answer);
     }
-}
-
-void init_array_by_elem(answer* answ, int count_elem, answer* elem) {
-    int answer_size;
-    int index = 0;
-    char str_size[MAX_STR_NUM_SIZE];
-
-    snprintf(str_size, MAX_STR_NUM_SIZE, "%d", count_elem); // *<integer>\r\n
-
-    answer_size = 1  + strlen(str_size) + 2 + count_elem * elem->answer_size;
-
-    free(answ->answer);
-
-    answ->answer_size = answer_size;
-    answ->answer = wcalloc(answer_size * sizeof(char));
-
-    answ->answer[index] = '*';
-    index++;
-    memcpy(answ->answer + index, str_size, strlen(str_size));
-    index += strlen(str_size);
-    memcpy(answ->answer + index, crlf, 2);
-    index += 2;
-
-    for (int i = 0; i < count_elem; ++i) {
-        memcpy(answ->answer + index, elem->answer, elem->answer_size);
-        index += elem->answer_size;
-    }
-}
-
-void init_array_by_elems(answer* answ, int count_elems, answer** elems) {
-    int answer_size;
-    int index = 0;
-    char str_size[MAX_STR_NUM_SIZE];
-
-
-    snprintf(str_size, MAX_STR_NUM_SIZE, "%d", count_elems); // *<integer>\r\n
-
-    answer_size = 1 + strlen(str_size) + 2;
-
-    for (int i = 0; i < count_elems; ++i) {
-        answer_size += elems[i]->answer_size;
-    }
-
-    answ->answer_size = answer_size;
-    answ->answer = wcalloc(answer_size * sizeof(char));
-
-    answ->answer[index] = '*';
-    index++;
-    memcpy(answ->answer + index, str_size, strlen(str_size));
-    index += strlen(str_size);
-    memcpy(answ->answer + index, crlf, 2);
-    index += 2;
-
-    for (int i = 0; i < count_elems; ++i) {
-        memcpy(answ->answer + index, elems[i]->answer, elems[i]->answer_size);
-        index += elems[i]->answer_size;
-    }
-}
-
-int get_array_size(answer* answ) {
-    char *endptr;
-    int count_len_array ;
-
-    errno = 0;
-    count_len_array =  strtol(answ->answer + 1, &endptr, 10);
-    if (errno != 0 || *endptr != '\r') {
-        char* err = strerror(errno);
-        int err_code = errno;
-        ereport(INFO, errmsg("get_array_size: errno %d err %s  *endptr %d %c count_len_array %d", err_code,  err,*endptr,*endptr, count_len_array));
-
-        return -1;
-    }
-
-    return count_len_array;
+    free(sub_answers);
 }

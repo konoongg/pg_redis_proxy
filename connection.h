@@ -19,7 +19,7 @@ typedef struct requests requests;
 typedef struct write_data write_data;
 typedef struct wthread wthread;
 
-connection* create_connection(int fd);
+connection* create_connection(int fd, wthread* wthrd);
 void add_active(connection* conn);
 void add_wait(connection* conn);
 void delete_active(connection* conn);
@@ -73,6 +73,7 @@ enum conn_status {
     WRITE,
     WAIT,
     PROCESS,
+    NOTIFY,
 };
 
 struct client_req {

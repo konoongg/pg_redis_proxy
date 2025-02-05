@@ -7,6 +7,8 @@ typedef struct cache_data cache_data;
 typedef struct column column;
 typedef struct table table;
 typedef struct values values;
+typedef union db_data db_data;
+typedef struct string string;
 
 enum db_type {
     BOOL,
@@ -33,6 +35,15 @@ struct db_meta_data {
     int count_tables;
 };
 
+struct string {
+    char* str;
+    int size;
+};
+
+union db_data {
+    int num;
+    string str;
+};
 
 struct values {
     int count_attr;
@@ -40,7 +51,7 @@ struct values {
 };
 
 struct attr {
-    void* data;
+    db_data* data;
     db_type type;
     bool is_nullable;
 }
