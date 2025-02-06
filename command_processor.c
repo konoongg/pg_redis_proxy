@@ -158,7 +158,7 @@ process_result process_command(client_req* req, answer* answ) {
     command_entry* cur_command = com_dict->commands[hash]->first;
     while (cur_command != NULL) {
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
-            return cur_command->command->func(req, answ, db_conn);
+            return cur_command->command->func(req, answn);
         }
         cur_command = cur_command->next;
     }

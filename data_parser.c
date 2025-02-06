@@ -84,9 +84,6 @@ exit_status pars_data(read_data* data) {
                 data->pars.cur_count_argv++;
                 data->pars.size_str = data->pars.cur_size_str = 0;
 
-
-
-                //ereport(INFO, errmsg("pars_data: data->pars.cur_count_argv(%d) == data->reqs->last->argc(%d) ",data->pars.cur_count_argv,  data->reqs->last->argc));
                 if (data->pars.cur_count_argv == data->reqs->last->argc) {
                     data->pars.cur_count_argv = 0;
                     data->pars.cur_read_status = CR;
@@ -97,12 +94,10 @@ exit_status pars_data(read_data* data) {
                 }
             }
         } else if(cur_status == END) {
-            //ereport(INFO, errmsg("pars_data:9 cur_status == END"));
             replace_part_of_buffer(data, cur_buffer_index);
             data->pars.cur_read_status = ARRAY_WAIT;
             return ALL;
         } else {
-            //ereport(INFO, errmsg("pars_data: 10 unknown pars state"));
             return ERR;
         }
     }

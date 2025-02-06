@@ -48,39 +48,20 @@ void delete_active(connection* conn) {
 }
 
 connection* create_connection(int fd, wthread* wthrd) {
-    read_data* r_data;
-    write_data* w_data;
-    char* read_buffer;
-    requests* reqs;
+    event_data* r_data;
+    event_data* w_data;
     connection* conn = (connection*)wcalloc(sizeof(connection));
 
     conn->fd = fd;
 
-    w_data = (write_data*)wcalloc(sizeof(write_data));
-    r_data = (read_data*)wcalloc(sizeof(read_data));
+    w_data = (event_data*)wcalloc(sizeof(event_data));
+    r_data = (event_data*)wcalloc(sizeof(event_data));
 
     r_data->handle = wcalloc(sizeof(handle));
     w_data->handle = wcalloc(sizeof(handle));
 
-    read_buffer = wcalloc(config.worker_conf.buffer_size * sizeof(char));
-    reqs = wcalloc(sizeof(requests));
-    reqs->first = reqs->last = NULL;
-    reqs->count_req = 0;
-
     conn->w_data = w_data;
-    w_data->answers = wcalloc(sizeof(answer_list));
-    w_data->answers->first = w_data->answers->last = NULL;
-
     conn->r_data = r_data;
-    r_data->cur_buffer_size = 0;
-    r_data->pars.cur_count_argv = 0;
-    r_data->pars.cur_size_str = 0;
-    r_data->pars.parsing_num = 0;
-    r_data->pars.parsing_str = NULL;
-    r_data->pars.size_str = 0;
-    r_data->read_buffer = read_buffer;
-    r_data->pars.cur_read_status = ARRAY_WAIT;
-    r_data->reqs = reqs;
 
     conn->next = NULL;
     conn->prev = NULL;
@@ -126,4 +107,51 @@ void free_connection(connection* conn) {
     free(conn->r_data);
     free(conn->w_data);
     free(conn);
+}
+
+void init_wthread(wthread* wthrd) {
+    wthrd->active = wcalloc(sizeof(conn_list));
+    wthrd->active->first = wthrd.active->last = NULL;
+    wthrd->active_size = 0;
+    wthrd->wait = wcalloc(sizeof(conn_list));
+    wthrd->wait->first = wthrd.wait->last = NULL;
+    wthrd->wait_size = 0;
+}
+
+
+void loop_step(wthread* wthrd) {
+    while (wthrd->active_size != 0) {
+        connection* cur_conn = wthrd->active->first;
+        while (cur_conn != NULL) {
+            assert(!cur_conn->is_wait);
+            proc_status status = cur_conn->proc(cur_conn);
+            switch(status) {
+                case WAIT_PROC:
+                    delete_active(cur_conn);
+                    add_wait(cur_conn);
+                    break;
+                case DEL_PROC:
+                    delete_active(cur_conn);
+                    finish_connection(cur_conn);
+                    break;
+                case ALIVE_PROC:
+                    break;
+            }
+            cur_conn = cur_conn->next;
+        }
+    }
+}
+
+void free_wthread(void) {
+    close(wthrd.listen_socket);
+    close(wthrd.efd);
+    free(wthrd.active);
+    free(wthrd.wait);
+    loop_destroy(wthrd.l);
+}
+
+void finish_connection(connection* conn) {
+    event_stop(conn->wthrd, conn->r_data->handle);
+    event_stop(conn->wthrd, conn->w_data->handle);
+    free_connection(conn);
 }

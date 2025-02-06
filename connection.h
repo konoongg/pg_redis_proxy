@@ -12,11 +12,11 @@ typedef struct answer_list answer_list;
 typedef struct client_req client_req;
 typedef struct conn_list conn_list;
 typedef struct connection connection;
+typedef struct event_data event_data;
 typedef struct handle handle;
+typedef struct io_read io_read;
 typedef struct parsing parsing;
-typedef struct read_data read_data;
 typedef struct requests requests;
-typedef struct write_data write_data;
 typedef struct wthread wthread;
 
 connection* create_connection(int fd, wthread* wthrd);
@@ -25,6 +25,8 @@ void add_wait(connection* conn);
 void delete_active(connection* conn);
 void delete_wait(connection* conn);
 void free_connection(connection* conn);
+void init_wthread(wthread* wthrd);
+void loop_step(wthread* wthrd);
 
 /* status finish parsing
  * NOT_ALL - Need more data, wait data and reading
@@ -34,7 +36,6 @@ enum exit_status {
     NOT_ALL,
     ALL
 };
-
 
 struct answer {
     char* answer;
@@ -47,9 +48,16 @@ struct answer_list {
     answer* last;
 };
 
-// struct with ev_io WRITE
-struct write_data {
-    answer_list* answers;
+struct io_read {
+    char* read_buffer;
+    int buffer_size;
+    int cur_buffer_size;
+    parsing pars;
+    requests* reqs;
+};
+
+struct event_data {
+    void* data;
     handle* handle;
 };
 
@@ -74,6 +82,9 @@ enum conn_status {
     WAIT,
     PROCESS,
     NOTIFY,
+    NOTIFY_DB,
+    READ_DB,
+    WRITE_DB,
 };
 
 struct client_req {
@@ -105,17 +116,6 @@ struct handle {
     void* handle;
 };
 
-// struct with ev_io read
-struct read_data {
-    char* read_buffer;
-    int buffer_size;
-    int cur_buffer_size;
-    parsing pars;
-    requests* reqs;
-    handle* handle;
-    //struct ev_io* read_io_handle;
-};
-
 enum proc_status {
     ALIVE_PROC,
     DEL_PROC,
@@ -123,15 +123,16 @@ enum proc_status {
 };
 
 struct connection {
-    wthread* wthrd;
+    bool is_wait;
+    conn_status status;
     connection* next;
     connection* prev;
-    conn_status status;
-    proc_status (*proc)(wthread* wthrd, connection* data);
-    read_data* r_data;
-    write_data* w_data;
-    bool is_wait;
     int fd;
+    proc_status (*proc)(wthread* wthrd, connection* data);
+    event_data* r_data;
+    void* data;
+    event_data* w_data;
+    wthread* wthrd;
 };
 
 struct conn_list {

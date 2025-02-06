@@ -6,17 +6,49 @@
 
 #include "alloc.h"
 #include "config.h"
+#include "connection.h"
 #include "db.h"
 #include "storage_data.h"
 
 extern config_redis config;
 
-PGconn* conn = NULL;
 db_meta_data* meta;
 
-void connect_to_db() {
+
+void finish_connects(backend* backends) {
+    for (int i = 0; i < config.db_conf.count_backend; ++i) {
+        PQfinish(backends[i].conn);
+    }
+}
+
+db_oper_res write_to_db (PGconn* conn, char* req) {
+    if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
+        return WAIT_OPER_RES;
+    } else if (PQconnectPoll(conn) == PGRES_POLLING_FAILED) {
+        return ERR_OPER_RES;
+    } else if (PQconnectPoll(conn) == PGRES_POLLING_OK) {
+        PQsendQuery(conn, req);
+        return WRITE_OPER_RES;
+    }
+}
+
+db_oper_res read_from_db (PGconn* conn) {
+    if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
+        return WAIT_OPER_RES;
+    } else if (PQconnectPoll(conn) == PGRES_POLLING_FAILED) {
+        return ERR_OPER_RES;
+    } else if (PQconnectPoll(conn) == PGRES_POLLING_OK) {
+        PGresult* res = PQgetResult(conn);
+
+        PQclear(res);
+        return READ_OPER_RES;
+    }
+}
+
+void connect_to_db(backend* backends) {
     int conn_info_size;
     char* conn_info;
+
 
     conn_info_size = CONN_INFO_DEFAULT_SIZE + strlen(config.db_conf.dbname) + strlen(getlogin());
     conn_info = wcalloc(conn_info_size * sizeof(char));
@@ -24,17 +56,24 @@ void connect_to_db() {
         ereport(INFO, errmsg("init_db: can't create connection info"));
         abort();
     }
-    conn = PQconnectdb(conn_info);
-    if (conn == NULL) {
-        ereport(INFO, errmsg("connect_to_db: PQstatus is bad - %s",  PQerrorMessage(conn)));
-        abort();
+
+    for (int i = 0; i < config.db_conf.count_backend; ++i) {
+        backends[i].conn = PQconnectStart(conn_info);
+        if (backends.conn == NULL) {
+            ereport(INFO, errmsg("connect_to_db: PQstatus is bad - %s",  PQerrorMessage(backends[i].conn)));
+            finish_connects(backends);
+            abort();
+        }
+
+        if (PQstatus(backends[i].conn) == CONNECTION_BAD) {
+            ereport(INFO, errmsg("connect_to_db: PQstatus is bad - %s",  PQerrorMessage(backends[i].conn)));
+            finish_connects(backends);
+            abort();
+        }
+        backends[i].fd = PQsocket(backends[i].conn);
     }
 
-    if (PQstatus(conn) == CONNECTION_BAD) {
-        ereport(INFO, errmsg("connect_to_db: PQstatus is bad - %s",  PQerrorMessage(conn)));
-        PQfinish(conn);
-        abort();
-    }
+   free(conn_info);
 
 }
 
@@ -53,51 +92,51 @@ column* get_column_info(char* table_name, char* column_name) {
     return NULL;
 }
 
-void init_meta_data() {
-    meta = wcalloc(sizeof(db_meta_data));
-    const char* query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public';";
-    PGresult* res = PQexec(conn, query);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        ereport(INFO, errmsg("SELECT failed: %s", PQerrorMessage(conn)));
-        PQclear(res);
-        PQfinish(conn);
-        abort();
-    }
+// void init_meta_data() {
+//     meta = wcalloc(sizeof(db_meta_data));
+//     const char* query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public';";
+//     PGresult* res = PQexec(conn, query);
+//     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+//         ereport(INFO, errmsg("SELECT failed: %s", PQerrorMessage(conn)));
+//         PQclear(res);
+//         PQfinish(conn);
+//         abort();
+//     }
 
-    meta->count_tables = PQntuples(res);
-    meta->tables = wcalloc(meta->count_tables * sizeof(table));
-    for (int i = 0; i < meta->count_tables; ++i) {
-        char* table_name = PQgetvalue(res, i, 0);
-        int name_size = PQgetlength(res, i, 0);
-        memcpy(meta->tables[i].name, table_name, name_size);
-    }
-    PQclear(res);
+//     meta->count_tables = PQntuples(res);
+//     meta->tables = wcalloc(meta->count_tables * sizeof(table));
+//     for (int i = 0; i < meta->count_tables; ++i) {
+//         char* table_name = PQgetvalue(res, i, 0);
+//         int name_size = PQgetlength(res, i, 0);
+//         memcpy(meta->tables[i].name, table_name, name_size);
+//     }
+//     PQclear(res);
 
-    for (int i = 0; i < meta->count_tables; ++i) {
-        table* t = &(meta->tables[i]);
-        char* pattern = "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = '%s'";
+//     for (int i = 0; i < meta->count_tables; ++i) {
+//         table* t = &(meta->tables[i]);
+//         char* pattern = "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = '%s'";
 
 
-        char* query = COLUMN_INFO_SIZE + strlen(t->name);
-        if (sprintf(query, pattern, t->name) < 0) {
-            ereport(INFO, errmsg("init_meta_data: can't create connection info"));
-            abort();
-        }
+//         char* query = COLUMN_INFO_SIZE + strlen(t->name);
+//         if (sprintf(query, pattern, t->name) < 0) {
+//             ereport(INFO, errmsg("init_meta_data: can't create connection info"));
+//             abort();
+//         }
 
-        res = PQexec(conn, query);
-        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-            ereport(INFO, errmsg("SELECT failed: %s", PQerrorMessage(conn)));
-            PQclear(res);
-            PQfinish(conn);
-            abort();
-        }
+//         res = PQexec(conn, query);
+//         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+//             ereport(INFO, errmsg("SELECT failed: %s", PQerrorMessage(conn)));
+//             PQclear(res);
+//             PQfinish(conn);
+//             abort();
+//         }
 
-        t->count_column = PQnfields(res);
-        t->columns = wcalloc(t->count_column * sizeof(column));
-    }
-}
+//         t->count_column = PQnfields(res);
+//         t->columns = wcalloc(t->count_column * sizeof(column));
+//     }
+// }
 
-void init_db(void) {
+void init_db(backend*) {
     connect_to_db();
     init_meta_data();
 }

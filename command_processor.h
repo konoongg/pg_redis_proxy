@@ -15,9 +15,9 @@ typedef struct pg_data pg_data;
 typedef struct redis_command redis_command;
 typedef struct tuple_list tuple_list;
 
-void init_commands(void);
 process_result process_command(client_req* req, answer* answ);
 void free_resp_answ(void* ptr);
+void init_commands(void);
 void process_err(answer* answ, char* err);
 
 struct redis_command {

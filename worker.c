@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <eventfd.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -50,15 +51,10 @@ void* start_worker(void* argv);
 extern config_redis config;
 thread_local wthread wthrd;
 
-void finish_connection(connection* conn) {
-    event_stop(conn->wthrd, conn->r_data->handle);
-    event_stop(conn->wthrd, conn->w_data->handle);
-    free_connection(conn);
-}
-
 proc_status process_write(connection* conn) {
-    write_data* w_data = conn->write_data;
-    answer* cur_answer = w_data->answers->first;
+    event_data* w_data = conn->write_data;
+    answer_list* answers  = (answer_list*)w_data->data;
+    answer* cur_answer = answers->first;
 
     while (cur_answer != NULL) {
         int res = write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
@@ -66,7 +62,7 @@ proc_status process_write(connection* conn) {
             answer* next_answer = cur_answer->next;
             free_answer(cur_answer);
             cur_answer = next_answer;
-            w_data->answers->last = cur_answer;
+            answers->first = cur_answer;
         } else if (res == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return ALIVE_PROC;
@@ -79,48 +75,12 @@ proc_status process_write(connection* conn) {
             return ALIVE_PROC;
         }
     }
-    w_data->answers->first = w_data->answers->last = NULL;
+    answers->first = answers->last = NULL;
 
     start_event(conn->wthrd->l, conn->r_data->handle);
     stop_event(conn->wthrd->l, conn->w_data->handle);
 
     return WAIT_PROC;
-}
-
-proc_status process_data(connection* conn) {
-    read_data* r_data = conn->read_data;
-    write_data* w_data = conn->write_data;
-    client_req* cur_req;
-    answer* cur_answer;
-
-     while (true) {
-        process_result res;
-        cur_req = r_data->reqs->first;
-        if (cur_req == NULL) {
-            conn->status = WRITE;
-            conn->proc = process_write;
-            start_event(conn->wthrd->l, conn->w_data->handle);
-            return WAIT_PROC;
-        }
-
-        if (w_data->answers->first == NULL) {
-            w_data->answers->last = w_data->answers->first = wcalloc(sizeof(answer));
-        } else {
-            w_data->answers->last->next = wcalloc(sizeof(answer));
-            w_data->answers->last = w_data->answers->last->next;
-        }
-        cur_answer = w_data->answers->last;
-
-        res = process_command(cur_req, cur_answer);
-        if (res == DONE) {
-            r_data->reqs->first = r_data->reqs->first->next;
-            free_req(cur_req);
-        } else if (res == DB_REQ) {
-            return WAIT_PROC;
-        } else if  (res == PROCESS_ERR) {
-            abort();
-        }
-    }
 }
 
 proc_status notify(connection* conn) {
@@ -138,11 +98,47 @@ proc_status notify(connection* conn) {
     return WAIT_PROC;
 }
 
+proc_status process_data(connection* conn) {
+    io_read* r_data = (io_read*)conn->r_data->data;
+    answer_list* w_data = (answer_list*)conn->w_data->data;
+    client_req* cur_req;
+    answer* cur_answer;
+
+     while (true) {
+        process_result res;
+        cur_req = r_data->reqs->first;
+        if (cur_req == NULL) {
+            conn->status = WRITE;
+            conn->proc = process_write;
+            start_event(conn->wthrd->l, conn->w_data->handle);
+            return WAIT_PROC;
+        }
+
+        if (w_data->first == NULL) {
+            w_data->last = w_data->first = wcalloc(sizeof(answer));
+        } else {
+            w_data->last->next = wcalloc(sizeof(answer));
+            w_data->last = w_data->last->next;
+        }
+        cur_answer = w_data->last;
+
+        res = process_command(cur_req, cur_answer);
+        if (res == DONE) {
+            r_data->reqs->first = r_data->reqs->first->next;
+            free_req(cur_req);
+        } else if (res == DB_REQ) {
+            return WAIT_PROC;
+        } else if  (res == PROCESS_ERR) {
+            abort();
+        }
+    }
+}
+
 proc_status process_read(connection* conn) {
     exit_status status;
     int buffer_free_size;
     int res;
-    read_data* r_data = conn->read_data;
+    io_read* r_data = (io_read*)conn->r_data->data;
 
     buffer_free_size = r_data->buffer_size - r_data->cur_buffer_size;
     res = read(conn->fd, r_data->read_buffer + r_data->cur_buffer_size, buffer_free_size);
@@ -177,12 +173,39 @@ proc_status process_read(connection* conn) {
 proc_status process_accept(connection* conn) {
     int fd;
     connection* new_conn;
+    char* read_buffer;
+    requests* reqs;
 
     fd = accept(wthrd->listen_socket, NULL, NULL);
     if (fd == -1) {
         abort();
     }
     new_conn = create_connection(fd, &wthrd);
+
+    io_read* io_r = wcalloc(sizeof(io_r));
+    answer_list* a_list = wcalloc(sizeof(answer_list));
+
+    read_buffer = wcalloc(config.worker_conf.buffer_size * sizeof(char));
+    reqs = wcalloc(sizeof(requests));
+    reqs->first = reqs->last = NULL;
+    reqs->count_req = 0;
+
+    a_list->first = a_list->last = NULL;
+
+
+    io_r->cur_buffer_size = 0;
+    io_r->pars.cur_count_argv = 0;
+    io_r->pars.cur_size_str = 0;
+    io_r->pars.parsing_num = 0;
+    io_r->pars.parsing_str = NULL;
+    io_r->pars.size_str = 0;
+    io_r->read_buffer = read_buffer;
+    io_r->pars.cur_read_status = ARRAY_WAIT;
+    io_r->reqs = reqs;
+
+    new_conn->r_data->data = io_r;
+    new_conn->w_data->data = answer_list;
+
     add_wait(new_conn);
 
     init_event(new_conn, new_conn->r_data->handle, new_conn->fd, EVENT_READ);
@@ -195,36 +218,6 @@ proc_status process_accept(connection* conn) {
     return WAIT_PROC;
 }
 
-void loop_step(void) {
-    while (wthrd.active_size != 0) {
-        connection* cur_conn = wthrd.active->first;
-        while (cur_conn != NULL) {
-            assert(!cur_conn->is_wait);
-            proc_status status = cur_conn->proc(cur_conn);
-            switch(status) {
-                case WAIT_PROC:
-                    delete_active(cur_conn);
-                    add_wait(cur_conn);
-                    break;
-                case DEL_PROC:
-                    delete_active(cur_conn);
-                    finish_connection(cur_conn);
-                    break;
-                case ALIVE_PROC:
-                    break;
-            }
-            cur_conn = cur_conn->next;
-        }
-    }
-}
-
-void free_wthread(void) {
-    close(wthrd.listen_socket);
-    close(wthrd.efd);
-    free(wthrd.active);
-    free(wthrd.wait);
-    loop_destroy(wthrd.l);
-}
 
 void* start_worker(void* argv) {
     bool run;
@@ -237,20 +230,12 @@ void* start_worker(void* argv) {
         abort();
     }
 
-
+    init_wthread(&wthrd);
     init_loop(&wthrd);
 
-    init_event(listen_conn, listen_conn->r_data->handle, listen_conn->fd, EVENT_READ);
-
-
-    wthrd.active = wcalloc(sizeof(conn_list));
-    wthrd.active->first = wthrd.active->last = NULL;
-    wthrd.active_size = 0;
-    wthrd.wait = wcalloc(sizeof(conn_list));
-    wthrd.wait->first = wthrd.wait->last = NULL;
-    wthrd.wait_size = 0;
 
     listen_conn = create_connection(listen_socket, &wthrd);
+    init_event(listen_conn, listen_conn->r_data->handle, listen_conn->fd, EVENT_READ);
     add_wait(listen_conn);
     listen_conn->proc = process_accept;
     listen_conn->status = ACCEPT;
@@ -265,16 +250,17 @@ void* start_worker(void* argv) {
     }
 
     efd_conn = create_connection(wthrd.efd, &wthrd);
+    init_event(efd_conn, listen_efd_connconn->r_data->handle, efd_conn->fd, EVENT_READ);
     add_wait(efd_conn);
-    listen_conn->proc = notify;
-    listen_conn->status = NOTIFY;
+    efd_conn->proc = notify;
+    efd_conn->status = NOTIFY;
 
     start_event(wthrd->l, efd_conn->r_data->handle);
 
     while (true) {
         CHECK_FOR_INTERRUPTS();
         loop_run(wthrd.l);
-        loop_step();
+        loop_step(&wthrd);
     }
     return NULL;
 }
