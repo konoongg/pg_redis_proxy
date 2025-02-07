@@ -30,7 +30,7 @@ struct cache_basket {
 
 struct kv_storage {
     cache_basket* kv;
-    uint64_t (*hash_func)(char* key, int key_size, int count_basket, void* argv);
+    uint64_t (*hash_func)(void* key, int len, void* argv);
 };
 
 struct cache {

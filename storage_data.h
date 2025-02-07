@@ -5,10 +5,12 @@ typedef enum db_type db_type;
 typedef struct attr attr;
 typedef struct cache_data cache_data;
 typedef struct column column;
+typedef struct req_column req_column;
+typedef struct req_table req_table;
+typedef struct string string;
 typedef struct table table;
 typedef struct values values;
 typedef union db_data db_data;
-typedef struct string string;
 
 enum db_type {
     BOOL,
@@ -62,6 +64,19 @@ struct cache_data {
     char* key;
     int key_size;
     time_t last_time;
+};
+
+struct req_column {
+    char* column_name;
+    int data_size;
+    char* data;
+};
+
+struct req_table {
+    char* table;
+    int count_field;
+    int count_tuple;
+    req_column** columns;
 };
 
 #endif

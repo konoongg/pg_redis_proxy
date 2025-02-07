@@ -1,6 +1,8 @@
 #ifndef CONFIG_PARSER_H
 #define CONFIG_PARSER_H
 
+#include <stdint.h>
+
 typedef enum cache_mode cache_mode;
 typedef enum maxmemory_policy maxmemory_policy;
 typedef struct cache_conf cache_conf;
@@ -32,6 +34,7 @@ struct cache_conf {
     int databases;
     int ttl_s;
     maxmemory_policy mm_policy;
+    uint8_t seed;
 };
 
 struct db_conn_conf {

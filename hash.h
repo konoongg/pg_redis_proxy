@@ -7,6 +7,6 @@
 
 int hash_pow_31_mod_100(char* key);
 
-uint64_t murmur_hash_2(char* key, int len, int count_basket, void* argv);
+uint64_t siphash(void* key, int len, void* argv);
 
 #endif

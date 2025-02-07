@@ -49,7 +49,7 @@ void init_cache(void) {
     storage = c->storage;
 
     c->count_basket = config.c_conf.count_basket;
-    storage->hash_func = murmur_hash_2;
+    storage->hash_func = siphash;
     storage->kv = wcalloc(c->count_basket * sizeof(cache_basket));
 
     for (int i = 0; i < c->count_basket; ++i) {

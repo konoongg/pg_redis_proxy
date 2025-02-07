@@ -21,6 +21,26 @@ void finish_connects(backend* backends) {
     }
 }
 
+void pars_db_data(PGresult* res, req_table* table_info) {
+    db_data* data = wcalloc(sizeof(db_data));
+    table_info->count_tuple = PQntuples(res);
+    data->count_field = PQnfields(res);
+
+    table_info->req_column = wcalloc(table_info->count_tuple * sizeof(req_column*));
+
+    for (int i = 0; i < table_info->count_tuple; ++i) {
+        table_info->req_column[i]
+        data->tuples[row] = wcalloc(data->count_column * sizeof(char*));
+        data->size_value[row] = wcalloc(data->count_column * sizeof(int));
+        for (int column = 0; column < data->count_column; ++column) {
+            data->tuples[row][column] = PQgetvalue(res, row, column);
+            data->size_value[row][column] = PQgetlength(res, row, column);
+        }
+    }
+    return data;
+}
+
+
 db_oper_res write_to_db (PGconn* conn, char* req) {
     if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
         return WAIT_OPER_RES;
@@ -32,7 +52,7 @@ db_oper_res write_to_db (PGconn* conn, char* req) {
     }
 }
 
-db_oper_res read_from_db (PGconn* conn) {
+db_oper_res read_from_db (PGconn* conn, req_table* table_info) {
     if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
         return WAIT_OPER_RES;
     } else if (PQconnectPoll(conn) == PGRES_POLLING_FAILED) {
@@ -41,6 +61,13 @@ db_oper_res read_from_db (PGconn* conn) {
         PGresult* res = PQgetResult(conn);
 
         PQclear(res);
+
+        res = PQgetResult(conn);\
+        if (res != NULL) {
+            ereport(INFO, errmsg("read_from_db: second res - error"));
+            return ERR_OPER_RES;
+        }
+
         return READ_OPER_RES;
     }
 }
@@ -140,24 +167,3 @@ void init_db(backend*) {
     connect_to_db();
     init_meta_data();
 }
-
-
-// db_data* pars_db_data(PGresult* res) {
-//     db_data* data = wcalloc(sizeof(db_data));
-//     data->count_rows = PQntuples(res);
-//     data->count_column = PQnfields(res);
-
-//     data->tuples = wcalloc(data->count_rows * sizeof(char**));
-//     data->size_value = wcalloc(data->count_rows * sizeof(int*));
-
-//     for (int row = 0; row < data->count_rows; ++row) {
-//         data->tuples[row] = wcalloc(data->count_column * sizeof(char*));
-//         data->size_value[row] = wcalloc(data->count_column * sizeof(int));
-//         for (int column = 0; column < data->count_column; ++column) {
-//             data->tuples[row][column] = PQgetvalue(res, row, column);
-//             data->size_value[row][column] = PQgetlength(res, row, column);
-//         }
-//     }
-//     return data;
-// }
-
