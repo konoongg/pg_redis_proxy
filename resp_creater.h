@@ -21,6 +21,8 @@ typedef struct resp_int_arg resp_int_arg;
 typedef union generic_resp_arg generic_resp_arg;
 typedef struct default_resp_answer default_resp_answer;
 
+void create_array_resp(answer* answ, values* res);
+void create_num_resp(answer* answ, int num);
 
 enum resp_type {
     INT,
@@ -57,6 +59,7 @@ union generic_resp_arg {
 
 struct default_resp_answer {
     answer ok;
+    answer pong;
 };
 
 #endif

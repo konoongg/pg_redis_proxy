@@ -12,6 +12,9 @@ typedef struct table table;
 typedef struct values values;
 typedef union db_data db_data;
 
+values* create_copy_data(values* v);
+void free_values(values* v);
+
 enum db_type {
     BOOL,
     DOUBLE,

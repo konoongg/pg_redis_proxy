@@ -7,7 +7,7 @@
 
 #define COMMAND_DICT_SIZE 3
 
-typedef enum process_result  process_result;
+typedef enum process_result process_result;
 typedef struct command_dict command_dict;
 typedef struct command_entry command_entry;
 typedef struct entris entris;

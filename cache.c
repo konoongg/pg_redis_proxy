@@ -28,8 +28,6 @@ void free_data_from_cache(cache_data* data);
 cache* c;
 extern config_redis config;
 
-
-
 void free_data_from_cache(cache_data* data) {
     for (int i = 0; i < data->values->count_attr; ++i) {
         free(data->values->attr->data);
@@ -114,7 +112,7 @@ values* get_cache(char* key, int key_size) {
 
     data = find_data_in_basket(basket, new_data.key, new_data.key_size);
     if (data != NULL && check_ttl(data->last_time)) {
-        result = data->values;
+        result = create_copy_data(data->values);
     }
 
     err = pthread_spin_unlock(basket->lock);

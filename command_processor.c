@@ -24,6 +24,7 @@ redis_command commands[] = {
     {"del", do_del},
     {"get", do_get},
     {"set", do_set},
+    {"ping", do_ping}
 };
 
 req_table* create_req(char* value, int value_size) {
@@ -78,20 +79,23 @@ void free_req(req_table* req) {
     free(req);
 }
 
-process_result do_get(client_req* req, answer* answ) {
-    values* res = get_cache(req->argv[1], req->argv_size[1]);
+process_result do_ping(client_req* req, answer* answ) {
+    answ->answer_size = def_resp.pong.answer_size;
+    answ->answer = mcalloc(answ->answer_size  * sizeof(char));
+    memcpy(answ->answer, def_resp.pong.answer, answ->answer_size);
+    return DONE;
+}
 
-    if (res == NULL) {
+process_result do_get(client_req* req, answer* answ) {
+    values* v = get_cache(req->argv[1], req->argv_size[1]);
+
+    if (v == NULL) {
         register_command();
         return DB_REQ;
     }
 
-    create_array_resp(res, answ);
-
-    if (unlock_cache_basket(req->argv[1], req->argv_size[1]) != 0) {
-        create_err_resp(answ, "ERR syntax error");
-        return PROCESS_ERR;
-    }
+    create_array_resp(v, answ);
+    free_values(v);
     return DONE;
 }
 
@@ -104,8 +108,9 @@ process_result do_set(client_req* req, answer* answ) {
 
     answ->answer_size = def_resp.ok.answer_size;
     answ->answer = mcalloc(answ->answer_size  * sizeof(char));
-    memcpe(answ->answer, def_resp.ok.answer, answ->answer_size);
+    memcpy(answ->answer, def_resp.ok.answer, answ->answer_size);
 
+    register_command();
     return DB_REQ;
 }
 

@@ -18,6 +18,9 @@ default_resp_answer def_resp;
 def_resp.ok.answer = "+OK\r\n";
 def_resp.ok.answer_size = 5;
 
+def_resp.pong.answer = "+PONG\r\n";
+def_resp.pong.answer_size = 7;
+
 void create_simple_string_resp(answer* answ, char* src) {
     int answ_size = 1 + strlen(src) + 2;  // +<src>\n\r
     int index = 0;
