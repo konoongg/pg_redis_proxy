@@ -67,6 +67,8 @@ proc_status process_write(connection* conn) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return ALIVE_PROC;
             }
+
+            delete_active(conn);
             finish_connection(conn);
             return DEL_PROC;
         } else {
@@ -80,6 +82,8 @@ proc_status process_write(connection* conn) {
     start_event(conn->wthrd->l, conn->r_data->handle);
     stop_event(conn->wthrd->l, conn->w_data->handle);
 
+
+    move_from_active_to_wait(conn);
     return WAIT_PROC;
 }
 
@@ -95,6 +99,7 @@ proc_status notify(connection* conn) {
         return ALIVE_PROC;
     }
 
+    move_from_active_to_wait(conn);
     return WAIT_PROC;
 }
 
@@ -111,6 +116,8 @@ proc_status process_data(connection* conn) {
             conn->status = WRITE;
             conn->proc = process_write;
             start_event(conn->wthrd->l, conn->w_data->handle);
+
+            move_from_active_to_wait(conn);
             return WAIT_PROC;
         }
 
@@ -122,11 +129,12 @@ proc_status process_data(connection* conn) {
         }
         cur_answer = w_data->last;
 
-        res = process_command(cur_req, cur_answer);
+        res = process_command(cur_req, cur_answer, conn);
         if (res == DONE) {
             r_data->reqs->first = r_data->reqs->first->next;
             free_req(cur_req);
         } else if (res == DB_REQ) {
+            // process_command moved conenction
             return WAIT_PROC;
         } else if  (res == PROCESS_ERR) {
             abort();
@@ -148,6 +156,8 @@ proc_status process_read(connection* conn) {
         status = pars_data(r_data);
         if (status == ERR) {
             conn->status = CLOSE;
+            delete_active(conn);
+            finish_connection(conn);
             return DEL_PROC;
         } else if (status == ALL) {
             while (status == ALL) {
@@ -158,14 +168,19 @@ proc_status process_read(connection* conn) {
             conn->proc = process_data;
             return ALIVE_PROC;
         } else if (status == NOT_ALL) {
+            move_from_active_to_wait(conn);
             return WAIT_PROC;
         }
     } else if (res == 0) {
         conn->status = CLOSE;
+        delete_active(conn);
+        finish_connection(conn);
         return DEL_PROC;
 
     } else if (res < 0) {
         conn->status = CLOSE;
+        delete_active(conn);
+        finish_connection(conn);
         return DEL_PROC;
     }
 }
@@ -215,6 +230,8 @@ proc_status process_accept(connection* conn) {
     new_conn->proc = process_read;
 
     start_event(wthrd->l, r_data->handle);
+
+    move_from_active_to_wait(conn);
     return WAIT_PROC;
 }
 

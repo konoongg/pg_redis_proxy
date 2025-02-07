@@ -12,14 +12,16 @@ typedef struct db_worker db_worker;
 typedef struct list_command list_command;
 
 cache_data* init_cache_data(char* key, int key_size, req_table* args);
+void register_command(char* key, char* value, connection* conn, com_reason reason)
 void free_cache_data(cache_data* data);
 void init_db_worker(void);
 
 struct command_to_db {
     char* cmd;
-    int notify_fd;
+    connection* conn;
     command_to_db* next;
     char* table;
+    com_reason reason;
 };
 
 struct list_command {
@@ -38,7 +40,6 @@ struct db_worker {
     backend* backends;
     int count_backends;
     wthread* wthrd;
-    pthread_spinlock_t* lock;
 };
 
 #endif

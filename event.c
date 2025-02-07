@@ -66,6 +66,5 @@ void callback(EV_P_ struct ev_io* io_handle, int revents) {
     }
 
     assert(conn->is_wait);
-    delete_wait(conn);
-    add_active(conn);
+    move_from_wait_to_active(conn);
 }

@@ -24,9 +24,12 @@ void add_active(connection* conn);
 void add_wait(connection* conn);
 void delete_active(connection* conn);
 void delete_wait(connection* conn);
+void event_notify(int fd);
 void free_connection(connection* conn);
 void init_wthread(wthread* wthrd);
 void loop_step(wthread* wthrd);
+void move_from_active_to_wait(connection* conn);
+void move_from_wait_to_active(connection* conn);
 
 /* status finish parsing
  * NOT_ALL - Need more data, wait data and reading
@@ -147,6 +150,7 @@ struct wthread {
     int wait_size;
     int efd;
     event_loop* l;
+    pthread_spinlock_t* lock;
 };
 
 #endif

@@ -1,3 +1,5 @@
+#include <errno.h>
+
 #include "connection.h"
 
 void add(conn_list* list) ;
@@ -26,25 +28,114 @@ void delete(connection* conn, conn_list* list) {
 }
 
 void add_active(connection* conn) {
+    int err = pthread_spin_lock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("add_active: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
     conn->is_wait = false;
     add(conn->wthrd->active);
     conn->wthrd->active_size++;
+
+    err = pthread_spin_unlock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("add_active: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
 }
 
 void delete_active(connection* conn) {
+    int err = pthread_spin_lock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("delete_active: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
     delete(conn, conn->wthrd->active);
     conn->wthrd->active_size--;
+
+    err = pthread_spin_unlock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("delete_active: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
 }
 
 void add_wait(connection* conn) {
+    int err = pthread_spin_lock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("add_wait: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
     conn->is_wait = true;
     add(conn->wthrd->wait);
     conn->wthrd->wait_size++;
+
+    err = pthread_spin_unlock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("add_wait: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
 }
 
-void delete_active(connection* conn) {
-    delete(conn, conn->wthrd->wait);
+
+void delete_wait(connection* conn) {
+    int err = pthread_spin_lock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("delete_wait: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
+    delete(conn, conn->wthrd->);
     conn->wthrd->wait_size--;
+
+    err = pthread_spin_unlock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("delete_wait: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
+}
+
+void move_from_active_to_wait(connection* conn) {
+    int err = pthread_spin_lock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("move_from_active_to_wait: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
+    delete(conn, conn->wthrd->active);
+    conn->wthrd->active_size--;
+    conn->is_wait = true;
+    add(conn->wthrd->wait);
+    conn->wthrd->wait_size++;
+
+    err = pthread_spin_unlock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("move_from_active_to_wait: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
+}
+
+void move_from_wait_to_active(connection* conn) {
+    int err = pthread_spin_lock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("move_from_wait_to_active: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
+
+    delete(conn, conn->wthrd->);
+    conn->wthrd->wait_size--;
+    conn->is_wait = false;
+    add(conn->wthrd->active);
+    conn->wthrd->active_size++;
+
+    err = pthread_spin_unlock(conn->wthrd->lock);
+    if (err != 0) {
+        ereport(INFO, errmsg("move_from_wait_to_active: pthread_spin_unlock %s", strerror(err)));
+        abort();
+    }
 }
 
 connection* create_connection(int fd, wthread* wthrd) {
@@ -116,6 +207,14 @@ void init_wthread(wthread* wthrd) {
     wthrd->wait = wcalloc(sizeof(conn_list));
     wthrd->wait->first = wthrd.wait->last = NULL;
     wthrd->wait_size = 0;
+
+    wthrd->lock = wcalloc(sizeof(pthread_spinlock_t));
+
+    int err = pthread_spin_init(wthrd->lock, PTHREAD_PROCESS_PRIVATE);
+    if (err != 0) {
+        ereport(INFO, errmsg("init_wthread: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
 }
 
 
@@ -125,18 +224,6 @@ void loop_step(wthread* wthrd) {
         while (cur_conn != NULL) {
             assert(!cur_conn->is_wait);
             proc_status status = cur_conn->proc(cur_conn);
-            switch(status) {
-                case WAIT_PROC:
-                    delete_active(cur_conn);
-                    add_wait(cur_conn);
-                    break;
-                case DEL_PROC:
-                    delete_active(cur_conn);
-                    finish_connection(cur_conn);
-                    break;
-                case ALIVE_PROC:
-                    break;
-            }
             cur_conn = cur_conn->next;
         }
     }
@@ -154,4 +241,14 @@ void finish_connection(connection* conn) {
     event_stop(conn->wthrd, conn->r_data->handle);
     event_stop(conn->wthrd, conn->w_data->handle);
     free_connection(conn);
+}
+
+void event_notify(int fd) {
+    char sig_ev = 0;
+    int res = write(fd, &sig_ev, 1);
+    if (res == -1) {
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("register_command: write %s", err));
+        abort();
+    }
 }

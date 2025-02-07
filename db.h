@@ -18,7 +18,7 @@ typedef enum db_oper_res db_oper_res;
 
 void init_db();
 void finish_connects(backend* backends);
-db_oper_res write_to_db (PGconn* conn, char* req) 
+db_oper_res write_to_db (PGconn* conn, char* req);
 column* get_column_info(char* table_name, char* column_name);
 
 enum db_oper_res {

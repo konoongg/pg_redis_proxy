@@ -79,18 +79,21 @@ void free_req(req_table* req) {
     free(req);
 }
 
-process_result do_ping(client_req* req, answer* answ) {
+process_result do_ping(client_req* req, answer* answ, connection* conn) {
     answ->answer_size = def_resp.pong.answer_size;
     answ->answer = mcalloc(answ->answer_size  * sizeof(char));
     memcpy(answ->answer, def_resp.pong.answer, answ->answer_size);
     return DONE;
 }
 
-process_result do_get(client_req* req, answer* answ) {
-    values* v = get_cache(req->argv[1], req->argv_size[1]);
+process_result do_get(client_req* req, answer* answ, int tnotify_fd) {
+    char key = req->argv[1];
+    int key_size = req->argv_size[1];
+    values* v = get_cache(key, key_size);
 
     if (v == NULL) {
-        register_command();
+        move_from_active_to_wait(conn);
+        register_command(key, key_size, tnotify_fd, CACHE_UPDATE);
         return DB_REQ;
     }
 
@@ -99,7 +102,7 @@ process_result do_get(client_req* req, answer* answ) {
     return DONE;
 }
 
-process_result do_set(client_req* req, answer* answ) {
+process_result do_set(client_req* req, answer* answ, connection* conn) {
     req_table* new_req = create_req(req->argv[2], req->argv_size[2]);
     cache_data* data = init_cache_data(req->argv[1], req->argv_size[1], new_req);
     set_cache(data);
@@ -110,16 +113,18 @@ process_result do_set(client_req* req, answer* answ) {
     answ->answer = mcalloc(answ->answer_size  * sizeof(char));
     memcpy(answ->answer, def_resp.ok.answer, answ->answer_size);
 
+    move_from_active_to_wait(conn);
     register_command();
     return DB_REQ;
 }
 
-process_result do_del(client_req* req, answer* answ) {
+process_result do_del(client_req* req, answer* answ, connection* conn) {
     int count_del = 0;
     for (int i = 1; i < req->argc; ++i) {
         count_del += delete_cache(req->argv[i], req->argv_size[i]);
     }
 
+    move_from_active_to_wait(conn);
     register_command();
     create_num_resp(answ, count_del);
     return DB_REQ;
@@ -157,7 +162,7 @@ void init_commands(void) {
     }
 }
 
-process_result process_command(client_req* req, answer* answ) {
+process_result process_command(client_req* req, answer* answ, connection* conn) {
     int hash = com_dict->hash_func(req->argv[0]);
     int size_command_name = strlen(req->argv[0]) + 1;
     command_entry* cur_command = com_dict->commands[hash]->first;
