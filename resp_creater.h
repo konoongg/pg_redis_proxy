@@ -9,7 +9,7 @@
     *<number of elements>\r\n<elements> - Arrays ($-1\r\n - null values)
 */
 
-#define MAX_STR_NUM_SIZE 20
+
 
 #include "connection.h"
 

@@ -14,30 +14,17 @@
 db_worker dbw;
 extern config_redis config;
 
-char* get_table_name(char* key) {
-    char* dot_position = strchr(key, '.');
-    if (dot_position != NULL) {
-        int length = dot_position - key;
-        char* table_name = wcalloc((length + 1) sizeof(char));
-        memcpy(table_name, key, length);
-        table_name[length] = '\0';
-        return table_name;
-    } else {
-        return NULL;
-    }
-}
-
 void free_command(command_to_db* cmd) {
     free(cmd->table);
     free(cmd->cmd);
     free(cmd);
 }
 
-void register_command(char* key, char* req, connection* conn, com_reason reason) {
+void register_command(char* tabl, char* req, connection* conn, com_reason reason) {
     command_to_db* cmd = wcalloc(sizeof(command_to_db));
     cmd->next = NULL;
     cmd->conn = conn;
-    cmd->table = get_table_name(key);
+    cmd->table = tabl;
     cmd->reason = reason;
     cmd->cmd = req;
 
@@ -184,10 +171,13 @@ cache_data* init_cache_data(char* key, int key_size, req_table* args) {
     data->values->count_attr = args->count_args;
     data->values->attr = wcalloc(args->count_args * sizeof(attr));
     for (int i = 0; i < args->count_args; ++i) {
+        int column_name_Size = strlen(args->args[i].column_name);
         column* c = get_column_info(args->table, args->args[i].column_name);
         req_column* attr = &(data->values->attr[i]);
         attr->type = c->type;
         memcpy(attr->data, args->attr[i].data, args->attr[i].data_size);
+        attr->column_name = wcalloc(column_name_Size * sizeof(char));
+        memcpy(attr->column_name, args->args[i].column_name, column_name_Size);
     }
     return data;
 }

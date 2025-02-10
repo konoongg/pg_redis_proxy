@@ -12,7 +12,7 @@ typedef struct db_worker db_worker;
 typedef struct list_command list_command;
 
 cache_data* init_cache_data(char* key, int key_size, req_table* args);
-void register_command(char* key, char* value, connection* conn, com_reason reason)
+void register_command(char* key, char* req, connection* conn, com_reason reason);
 void free_cache_data(cache_data* data);
 void init_db_worker(void);
 
@@ -31,7 +31,7 @@ struct list_command {
 };
 
 enum com_reason {
-    SYNC,
+    CACHE_SYNC,
     CACHE_UPDATE,
 };
 

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define MAX_STR_NUM_SIZE 20
+
 typedef enum cache_mode cache_mode;
 typedef enum maxmemory_policy maxmemory_policy;
 typedef struct cache_conf cache_conf;

@@ -58,6 +58,7 @@ struct values {
 struct attr {
     db_data* data;
     db_type type;
+    char* column_name;
     bool is_nullable;
 }
 

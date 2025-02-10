@@ -39,7 +39,8 @@ req_table* create_req(char* value, int value_size) {
         }
     }
 
-    req->columns = wcalloc(req->count_attr * sizeof(req_column));
+    req->columns = wcalloc(sizeof(req_column*));
+    req->columns[0] = wcalloc(req->count_attr * sizeof(req_column));
 
     start_pos = 0;
     cur_count_attr = 0;
@@ -58,17 +59,30 @@ req_table* create_req(char* value, int value_size) {
             attr_name_size = index_delim - start_pos;
             attr_size = cur_pos - index_delim - 1;
 
-            req->columns[cur_count_attr].column_name = wcalloc(attr_name_size  * sizeof(char));
-            req->columns[cur_count_attr].data = wcalloc( attr_size * sizeof(char));
+            req->columns[0][cur_count_attr].column_name = wcalloc(attr_name_size  * sizeof(char));
+            req->columns[0][cur_count_attr].data = wcalloc( attr_size * sizeof(char));
 
-            memcpy(req->columns[cur_count_attr].column_name, value + start_pos, attr_name_size);
-            memcpy(req->columns[cur_count_attr].column, value + index_delim + 1, attr_size);
-            req->columns[cur_count_attr].data_size = attr_size;
+            memcpy(req->columns[0][cur_count_attr].column_name, value + start_pos, attr_name_size);
+            memcpy(req->columns[0][cur_count_attr].column, value + index_delim + 1, attr_size);
+            req->columns[0][cur_count_attr].data_size = attr_size;
             cur_count_attr++;
             start_pos = cur_pos + 1;
         }
     }
     return req;
+}
+
+char* get_table_name(char* key) {
+    char* dot_position = strchr(key, '.');
+    if (dot_position != NULL) {
+        int length = dot_position - key;
+        char* table_name = wcalloc((length + 1) sizeof(char));
+        memcpy(table_name, key, length);
+        table_name[length] = '\0';
+        return table_name;
+    } else {
+        return NULL;
+    }
 }
 
 void free_req(req_table* req) {
@@ -86,14 +100,15 @@ process_result do_ping(client_req* req, answer* answ, connection* conn) {
     return DONE;
 }
 
-process_result do_get(client_req* req, answer* answ, int tnotify_fd) {
+process_result do_get(client_req* req, answer* answ, connection* conn) {
     char key = req->argv[1];
     int key_size = req->argv_size[1];
     values* v = get_cache(key, key_size);
 
     if (v == NULL) {
         move_from_active_to_wait(conn);
-        register_command(key, key_size, tnotify_fd, CACHE_UPDATE);
+        register_command(get_table_name(key), create_pg_get(key, key_size), conn, CACHE_UPDATE);
+        void register_command(char* key, char* req, connection* conn, com_reason reason)
         return DB_REQ;
     }
 
@@ -104,28 +119,30 @@ process_result do_get(client_req* req, answer* answ, int tnotify_fd) {
 
 process_result do_set(client_req* req, answer* answ, connection* conn) {
     req_table* new_req = create_req(req->argv[2], req->argv_size[2]);
+    char key = req->argv[1];
     cache_data* data = init_cache_data(req->argv[1], req->argv_size[1], new_req);
     set_cache(data);
-    free_cache_data(data);
-    free_req(req);
 
     answ->answer_size = def_resp.ok.answer_size;
     answ->answer = mcalloc(answ->answer_size  * sizeof(char));
     memcpy(answ->answer, def_resp.ok.answer, answ->answer_size);
 
     move_from_active_to_wait(conn);
-    register_command();
+    register_command(get_table_name(key), create_pg_set(data), conn, CACHE_UPDATE );
+    free_req(req);
+    free_cache_data(data);
     return DB_REQ;
 }
 
 process_result do_del(client_req* req, answer* answ, connection* conn) {
     int count_del = 0;
+    char key = req->argv[1];
     for (int i = 1; i < req->argc; ++i) {
         count_del += delete_cache(req->argv[i], req->argv_size[i]);
     }
 
     move_from_active_to_wait(conn);
-    register_command();
+    register_command(get_table_name(key), create_pg_del(req->argc, req->argv + 1, req->argv_size + 1), conn, CACHE_UPDATE);
     create_num_resp(answ, count_del);
     return DB_REQ;
 }
