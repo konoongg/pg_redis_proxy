@@ -1,9 +1,9 @@
 #include <assert.h>
 #include <errno.h>
-#include <eventfd.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/eventfd.h>
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <threads.h>
@@ -207,7 +207,7 @@ proc_status process_accept(connection* conn) {
     new_conn->w_data->data = a_list;
 
     new_conn->r_data->free_data = io_read_free;
-    new_conn->w_data->free_data = answer_
+    new_conn->w_data->free_data = answer_free;
 
     add_wait(new_conn);
 

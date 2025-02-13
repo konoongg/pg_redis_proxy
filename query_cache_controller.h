@@ -27,7 +27,7 @@ struct command_to_db {
     command_to_db* next;
     char* table;
     com_reason reason;
-    char key;
+    char* key;
     int key_size;
 };
 

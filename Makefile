@@ -14,6 +14,7 @@ OBJS = \
 	hash.o \
 	io.o \
 	pg_req_creater.o \
+	query_cache_controller.o \
 	redis_proxy.o \
 	resp_creater.o \
 	socket_wrapper.o \

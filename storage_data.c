@@ -3,7 +3,11 @@
 
 #include "libpq-fe.h"
 
+#include "alloc.h"
+#include "config.h"
 #include "storage_data.h"
+
+extern config_redis config;
 
 values* create_copy_data(values* v) {
     values* new_v = wcalloc(sizeof(values));
@@ -19,8 +23,8 @@ values* create_copy_data(values* v) {
 }
 
 void free_values(values* v) {
-    for (int i = 0; i < new_v->count_attr; ++i) {
-        free(new_v->attr[i].data);
+    for (int i = 0; i < v->count_attr; ++i) {
+        free(v->attr[i].data);
     }
     free(v->attr);
     free(v);
@@ -34,7 +38,7 @@ req_table* create_req_by_resp(char* value, int value_size) {
     req->count_field = 1;
     for (int i = 0; i < value_size; ++i) {
         if (value[i] == config.p_conf.delim) {
-            req->count_field;
+            req->count_field++;
         }
     }
 
@@ -62,7 +66,7 @@ req_table* create_req_by_resp(char* value, int value_size) {
             req->columns[0][cur_count_attr].data = wcalloc( attr_size * sizeof(char));
 
             memcpy(req->columns[0][cur_count_attr].column_name, value + start_pos, attr_name_size);
-            memcpy(req->columns[0][cur_count_attr].column, value + index_delim + 1, attr_size);
+            memcpy(req->columns[0][cur_count_attr].data, value + index_delim + 1, attr_size);
             req->columns[0][cur_count_attr].data_size = attr_size;
             cur_count_attr++;
             start_pos = cur_pos + 1;
@@ -86,21 +90,25 @@ req_table* create_req_by_pg(PGresult* res, char* table) {
         req->columns[row] = wcalloc(req->count_field * sizeof(req_column));
         for (int column = 0; column < req->count_field; ++column) {
             char* column_name = PQfname(res, column);
+            char* value;
+            int value_size;
+            int column_name_size;
+
             if (column_name == NULL) {
                 free_req(req);
                 return NULL;
             }
 
-            int column_name_size = strlen(column_name);
+            column_name_size = strlen(column_name);
             req->columns[row][column].column_name = wcalloc( column_name_size* sizeof(char));
             memcpy(req->columns[row][column].column_name, column_name, column_name_size);
 
-            char* value = PQgetvalue(res, row, column);
+            value = PQgetvalue(res, row, column);
             if (value == NULL) {
                 free_req(req);
                 return NULL;
             }
-            int value_size = PQgetlength(res, row, column);
+            value_size = PQgetlength(res, row, column);
             if (value_size == 0) {
                 free_req(req);
                 return NULL;

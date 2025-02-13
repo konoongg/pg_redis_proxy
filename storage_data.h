@@ -1,6 +1,8 @@
 #ifndef STORAGE_DATA_H
 #define STORAGE_DATA_H
 
+#include <stdbool.h>
+
 #include "libpq-fe.h"
 
 typedef enum db_type db_type;
