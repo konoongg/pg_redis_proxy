@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "connection.h"
+#include "io.h"
 
 #define COMMAND_DICT_SIZE 3
 
@@ -21,7 +22,7 @@ void init_commands(void);
 
 struct redis_command {
     char* name;
-    process_result (*func)(client_req* req, answer* answ, db_connect* db_conn);
+    process_result (*func)(client_req* req, answer* answ, connection* conn);
 };
 
 struct command_dict {

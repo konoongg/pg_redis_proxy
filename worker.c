@@ -20,25 +20,10 @@
 #include "data_parser.h"
 #include "db.h"
 #include "event.h"
+#include "io.h"
 #include "socket_wrapper.h"
 #include "worker.h"
 
- #define free_answer(answ) \
-    if (answ != NULL) { \
-        free(answ->answer); \
-        free(answ); \
-        answ = NULL; \
-    }
-
-#define free_req(req) \
-    if (req != NULL) { \
-        for (int i = 0; i < req->argc; ++i) { \
-            free(req->argv[i]); \
-        } \
-        free(req->argv); \
-        free(req); \
-        req = NULL; \
-    }
 
 int init_workers(void);
 proc_status process_accept(connection* conn);
@@ -219,7 +204,10 @@ proc_status process_accept(connection* conn) {
     io_r->reqs = reqs;
 
     new_conn->r_data->data = io_r;
-    new_conn->w_data->data = answer_list;
+    new_conn->w_data->data = a_list;
+
+    new_conn->r_data->free_data = io_read_free;
+    new_conn->w_data->free_data = answer_
 
     add_wait(new_conn);
 
@@ -248,7 +236,7 @@ void* start_worker(void* argv) {
     }
 
     init_wthread(&wthrd);
-    init_loop(&wthrd);
+    wthrd.l = init_loop();
 
 
     listen_conn = create_connection(listen_socket, &wthrd);

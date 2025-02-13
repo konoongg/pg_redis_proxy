@@ -9,9 +9,9 @@
     *<number of elements>\r\n<elements> - Arrays ($-1\r\n - null values)
 */
 
-
-
 #include "connection.h"
+#include "storage_data.h"
+#include "io.h"
 
 typedef enum resp_type resp_type;
 typedef struct resp_string_arg resp_string_arg;
@@ -23,12 +23,13 @@ typedef struct default_resp_answer default_resp_answer;
 
 void create_array_resp(answer* answ, values* res);
 void create_num_resp(answer* answ, int num);
+void init_def_resp (void);
 
 enum resp_type {
-    INT,
-    STRING,
-    BULK_STRING,
-    ARRAY,
+    INT_RESP,
+    STRING_RESP,
+    BULK_STRING_RESP,
+    ARRAY_RESP,
 };
 
 struct resp_string_arg{

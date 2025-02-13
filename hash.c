@@ -54,8 +54,8 @@ int hash_pow_31_mod_100(char* key) {
 }
 
 uint64_t siphash(void* key, int len, void* argv) {
-    uint8_t k = config.c_conf.seed;
-    const uint8_t* in = ,(uint8_t*) key;
+    uint8_t* k = &(config.c_conf.seed);
+    const uint8_t* in = (uint8_t*) key;
     size_t inlen = len;
 
     uint64_t v0 = 0x736f6d6570736575ULL;

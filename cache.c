@@ -62,13 +62,20 @@ void init_cache(void) {
 }
 
 cache_basket* get_basket(char* key, int key_size) {
-    kv_storage* storage = c->storage;
-    u_int64_t hash = storage->hash_func(key, key_size, c->count_basket, NULL);
+    kv_storage* storage;
+    u_int64_t hash;
+
+    storage = c->storage;
+    hash = storage->hash_func(key, key_size, NULL);
+
     return &(storage->kv[hash]);
 }
 
 cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
-    cache_data* data = basket->first;
+    cache_data* data;
+
+    data = basket->first;
+
     while (data != NULL) {
         if (memcmp(data->key, key, key_size) == 0 && data->key_size == key_size) {
             return data;
@@ -79,11 +86,13 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
 }
 
 bool check_ttl(cache_data* data) {
+    time_t cur_time;
+
     if (config.c_conf.ttl_s == 0 ) {
         return true;
     }
 
-    time_t cur_time = time(NULL);
+    cur_time = time(NULL);
     if (cur_time == -1) {
         char* err = strerror(errno);
         ereport(INFO, errmsg("get_cache: time error  %s", err));
@@ -100,18 +109,22 @@ bool check_ttl(cache_data* data) {
 }
 
 values* get_cache(char* key, int key_size) {
-    cache_basket* basket = get_basket(key, key_size);
-    cache_data* data
-    values* result = NULL;
+    cache_basket* basket;
+    cache_data* data;
+    int err;
+    values* result;
 
-    int err = pthread_spin_lock(basket->lock);
+    result = NULL;
+
+    basket = get_basket(key, key_size);
+    err = pthread_spin_lock(basket->lock);
     if (err != 0) {
         ereport(INFO, errmsg("get_cache: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
-    data = find_data_in_basket(basket, new_data.key, new_data.key_size);
-    if (data != NULL && check_ttl(data->last_time)) {
+    data = find_data_in_basket(basket, key, key_size);
+    if (data != NULL && check_ttl(data)) {
         result = create_copy_data(data->values);
     }
 
@@ -125,10 +138,13 @@ values* get_cache(char* key, int key_size) {
 }
 
 void set_cache(cache_data* new_data) {
-    cache_basket* basket = get_basket(new_data->key, new_data->key_size);
+    cache_basket* basket;
     cache_data* data;
+    int err;
 
-    int err = pthread_spin_lock(basket->lock);
+    basket = get_basket(new_data->key, new_data->key_size);
+
+    err = pthread_spin_lock(basket->lock);
     if (err != 0) {
         ereport(INFO, errmsg("get_cache: pthread_spin_lock %s", strerror(err)));
         abort();
@@ -140,15 +156,15 @@ void set_cache(cache_data* new_data) {
             data = basket->first = basket->last = wcalloc(sizeof(cache_data));
         } else {
             basket->last->next = wcalloc(sizeof(cache_data));
-            data = basket->last = basket->last->next
+            data = basket->last = basket->last->next;
         }
         data->next = NULL;
         data->key_size = new_data->key_size;
         data->key = new_data->key;
         data->values = new_data->values;
     } else {
-        for (int i = 0; i < data->count_attr; ++i) {
-            free(data->values->values[i].data);
+        for (int i = 0; i < data->values->count_attr; ++i) {
+            free(data->values->attr[i].data);
         }
         free(data->values);
         data->values = new_data->values;
@@ -166,21 +182,24 @@ void set_cache(cache_data* new_data) {
         ereport(INFO, errmsg("set_cache: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
-
-    return 0;
 }
 
 int delete_cache(char* key, int key_size) {
-    cache_basket* basket = get_basket(key, key_size);
+    cache_basket* basket;
+    cache_data* data;
+    cache_data* prev_data;
+    int err;
 
-    int err = pthread_spin_lock(basket->lock);
+    basket = get_basket(key, key_size);
+
+    err = pthread_spin_lock(basket->lock);
     if (err != 0) {
         ereport(INFO, errmsg("delete_cache: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
-    cache_data* data = basket->first;
-    cache_data* prev_data = NULL;
+    data = basket->first;
+    prev_data = NULL;
     while (data != NULL) {
         if (memcmp(data->key, key, key_size) == 0 && data->key_size == key_size) {
             break;
@@ -218,7 +237,7 @@ void free_cache(void) {
         cache_data* cur_data = basket->first;
         while (cur_data != NULL) {
             cache_data* new_data = cur_data->next;
-            cur_data->free_data(cur_data->data);
+            free_data_from_cache(cur_data);
             cur_data = new_data;
         }
     }
@@ -227,27 +246,3 @@ void free_cache(void) {
     free(c);
 }
 
-int lock_cache_basket(char* key, int key_size) {
-    cache_basket* basket = get_basket(key, key_size);
-
-
-    return 0;
-}
-
-int unlock_cache_basket(char* key, int key_size) {
-    cache_basket* basket = get_basket(key, key_size);
-
-    int err = pthread_spin_unlock(basket->lock);
-    if (err != 0) {
-        return -1;
-    }
-
-    return 0;
-}
-
-cache_data* create_cache_data(char* key, int key_size) {
-    cache_data data = wcalloc(sizeof(cache_data));
-    data.key = wcalloc(key_size * sizeof(char));
-    data.key_size = key_size;
-    data.values = wcalloc();
-}

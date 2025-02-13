@@ -10,7 +10,8 @@
 #include "cache.h"
 #include "command_processor.h"
 #include "config.h"
-#include "db.h"
+#include "query_cache_controller.h"
+#include "resp_creater.h"
 #include "socket_wrapper.h"
 #include "worker.h"
 
@@ -45,6 +46,8 @@ void proxy_start_work(Datum main_arg) {
 
     init_config();
     ereport(INFO, errmsg("finish init config"));
+
+    init_def_resp();
 
     init_commands();
     ereport(INFO, errmsg("finish init commands"));

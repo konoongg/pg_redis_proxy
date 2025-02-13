@@ -10,11 +10,14 @@ OBJS = \
 	config.o \
 	data_parser.o \
 	db.o \
+	event.o \
 	hash.o \
+	io.o \
 	pg_req_creater.o \
 	redis_proxy.o \
 	resp_creater.o \
 	socket_wrapper.o \
+	storage_data.o \
 	worker.o
 
 

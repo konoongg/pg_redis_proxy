@@ -14,18 +14,21 @@ void defalt_setting_init(void);
 extern config_redis config;
 
 void defalt_setting_init(void) {
+    FILE* fp;
+    int res;
+
     config.c_conf.count_basket = 100000;
     config.c_conf.databases = 16;
     config.c_conf.mm_policy = noeviction;
     config.c_conf.ttl_s = 5;
 
-    FILE* fp = fopen("/dev/urandom","r");
+    fp = fopen("/dev/urandom","r");
     if (fp == NULL) {
         char* err = strerror(errno);
         ereport(INFO, errmsg("defalt_setting_init: fopen error %s", err));
         abort();
     }
-    int res = fread(config.c_conf.seed, sizeof(uint8_t),1 , fp);
+    res = fread(&(config.c_conf.seed), sizeof(uint8_t),1 , fp);
 
     if (res != 1) {
         ereport(INFO, errmsg("defalt_setting_init: fread error"));

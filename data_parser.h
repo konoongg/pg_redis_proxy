@@ -2,7 +2,8 @@
 #define PARSER_H
 
 #include "connection.h"
+#include "io.h"
 
-exit_status pars_data(read_data* data) ;
+exit_status pars_data(io_read* data) ;
 
 #endif

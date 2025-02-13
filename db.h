@@ -2,7 +2,7 @@
 #define DB_H
 
 #define CONN_INFO_DEFAULT_SIZE 28
-#define COLUMN_INFO_SIZE 99
+#define TABLE_INFO_SIZE 96
 
 #include "libpq-fe.h"
 
@@ -10,16 +10,17 @@
 #include "connection.h"
 #include "storage_data.h"
 
+typedef enum db_oper_res db_oper_res;
 typedef struct backend backend;
 typedef struct column column;
 typedef struct db_meta_data db_meta_data;
 typedef struct table table;
-typedef enum db_oper_res db_oper_res;
 
-void init_db();
-void finish_connects(backend* backends);
-db_oper_res write_to_db (PGconn* conn, char* req);
+void init_db(backend* back);
 column* get_column_info(char* table_name, char* column_name);
+db_oper_res read_from_db(PGconn* conn, char* t, req_table** req);
+db_oper_res write_to_db (PGconn* conn, char* req);
+void finish_connects(backend* backends);
 
 enum db_oper_res {
     READ_OPER_RES,
@@ -29,10 +30,27 @@ enum db_oper_res {
 };
 
 struct backend {
-    PGconn* conn;
+    PGconn* conn_with_db;
     bool is_free;
     int fd;
     connection* conn;
+};
+
+struct column {
+    db_type type;
+    bool is_nullable;
+    char* column_name;
+};
+
+struct table {
+    int count_column;
+    column* columns;
+    char* name;
+};
+
+struct db_meta_data {
+    table* tables;
+    int count_tables;
 };
 
 #endif

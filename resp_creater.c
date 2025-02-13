@@ -8,6 +8,8 @@
 
 #include "alloc.h"
 #include "connection.h"
+#include "config.h"
+#include "io.h"
 #include "resp_creater.h"
 #include "storage_data.h"
 
@@ -15,11 +17,20 @@ const char crlf[] = "\r\n";
 
 default_resp_answer def_resp;
 
-def_resp.ok.answer = "+OK\r\n";
-def_resp.ok.answer_size = 5;
 
-def_resp.pong.answer = "+PONG\r\n";
-def_resp.pong.answer_size = 7;
+
+
+void create_bulk_string_resp(answer* answ, char* src, int size);
+void create_err_resp(answer* answ, char* src);
+void create_simple_string_resp(answer* answ, char* src);
+
+void init_def_resp (void) {
+    def_resp.ok.answer = "+OK\r\n";
+    def_resp.ok.answer_size = 5;
+
+    def_resp.pong.answer = "+PONG\r\n";
+    def_resp.pong.answer_size = 7;
+}
 
 void create_simple_string_resp(answer* answ, char* src) {
     int answ_size = 1 + strlen(src) + 2;  // +<src>\n\r
@@ -97,18 +108,21 @@ void create_bulk_string_resp(answer* answ, char* src, int size) {
 void create_array_resp(answer* answ, values* res) {
     int index = 0;
     char str_size_array[MAX_STR_NUM_SIZE];
+    int answ_size;\
+    answer* sub_answers;
+
     snprintf(str_size_array, MAX_STR_NUM_SIZE, "%d", res->count_attr);
 
-    int answ_size = strlen(str_size_array) + 1 + 2; //*<size>\r\n
-    answer* sub_answers = wcalloc(res->count_attr * sizeof(sub_answers));
+    answ_size = strlen(str_size_array) + 1 + 2; //*<size>\r\n
+    sub_answers = wcalloc(res->count_attr * sizeof(sub_answers));
 
     for (int i = 0; i < res->count_attr; ++i) {
         attr* a = &(res->attr[i]);
         switch (a->type) {
-            case INT:
+            case INT_RESP:
                 create_num_resp(&sub_answers[i], a->data->num);
                 break;
-            case STRING:
+            case STRING_RESP:
                 create_bulk_string_resp(&sub_answers[i], a->data->str.str, a->data->str.size);
                 break;
         }

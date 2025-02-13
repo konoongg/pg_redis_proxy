@@ -16,7 +16,7 @@ typedef struct data data;
 typedef struct kv_storage kv_storage;
 
 int delete_cache(char* key, int key_size);
-void set_cache(cache_data* new_data)
+void set_cache(cache_data* new_data);
 void free_cache(void);
 void init_cache(void);
 values* get_cache(char* key, int key_size);

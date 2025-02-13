@@ -15,18 +15,23 @@ db_worker dbw;
 extern config_redis config;
 
 void free_command(command_to_db* cmd) {
+    free(cmd->key);
     free(cmd->table);
     free(cmd->cmd);
     free(cmd);
 }
 
-void register_command(char* tabl, char* req, connection* conn, com_reason reason) {
+void register_command(char* tabl, char* req, connection* conn, com_reason reason, char* key, int key_size) {
     command_to_db* cmd = wcalloc(sizeof(command_to_db));
     cmd->next = NULL;
     cmd->conn = conn;
     cmd->table = tabl;
     cmd->reason = reason;
     cmd->cmd = req;
+
+    cmd->key = wcalloc(key_size * sizeof(char));
+    memcpy(cmd->key, key, key_size);
+    cmd->key_size = key_size;
 
     int err = pthread_spin_lock(dbw.lock);
     if (err != 0) {
@@ -58,7 +63,7 @@ command_to_db* get_command(void) {
         abort();
     }
 
-    command_to_db*  cmd =  dbw.commands->first;
+    command_to_db* cmd =  dbw.commands->first;
     dbw.commands->first = dbw.commands->first->next;
     dbw.commands->count_commands--;
 
@@ -76,9 +81,9 @@ command_to_db* get_command(void) {
 }
 
 proc_status process_write_db(connection* conn) {
-    int* id_back = (int*)conn->data;
+    backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
-    db_oper_res res = write_to_db(id_back, cmd->cmd);
+    db_oper_res res = write_to_db(back->conn_with_db, cmd->cmd);
     if (res == WRITE_OPER_RES) {
         conn->proc = process_read_db;
         conn->status = READ_DB;
@@ -94,12 +99,13 @@ proc_status process_write_db(connection* conn) {
 }
 
 proc_status process_read_db(connection* conn) {
-    int* id_back = (int*)conn->data;
+    backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
-    db_oper_res res = read_from_db(id_back, cmd->cmd);
+
+    req_table* req;
+    db_oper_res res = read_from_db(back->conn_with_db, cmd->table, &req);
     if (res == READ_OPER_RES) {
-        backend* b = conn->data;
-        b->is_free = true;
+        back->is_free = true;
         move_from_active_to_wait(conn);
         move_from_wait_to_active(cmd->conn);
 
@@ -107,7 +113,11 @@ proc_status process_read_db(connection* conn) {
         event_notify(cmd->conn->wthrd->efd);
 
         if (cmd->reason == CACHE_UPDATE) {
-            set_cache();
+            char* key = cmd->key;
+            int key_size = cmd->key_size;
+            cache_data* data = init_cache_data(key, key_size, req);
+            set_cache(data);
+            free_cache_data(data);
         }
 
         free_command(cmd);
@@ -125,6 +135,7 @@ proc_status process_read_db(connection* conn) {
             ereport(INFO, errmsg("process_read_db: pthread_spin_unlock %s", strerror(err)));
             abort();
         }
+
         return WAIT_PROC;
     } else if (res == WAIT_OPER_RES) {
         move_from_active_to_wait(conn);
@@ -155,6 +166,8 @@ proc_status notify_db(connection* conn) {
             dbw.backends[i].conn->data = &(dbw.backends[i]);
             dbw.backends[i].conn->proc = process_write_db;
             dbw.backends[i].conn->status = WRITE_DB;
+
+            start_event(dbw.wthrd->l, dbw.backends[i].conn->w_data->handle);
             break;
         }
     }
@@ -205,7 +218,7 @@ void init_db_worker(void) {
 
     dbw.wthrd = wcalloc(sizeof(wthread));
     init_wthread(dbw.wthrd);
-    init_loop(dbw.wthrd);
+    dbw.wthrd->l = init_loop();
 
     dbw.wthrd->efd = eventfd(0, EFD_NONBLOCK);
     if (wthrd.efd == -1) {
@@ -228,8 +241,6 @@ void init_db_worker(void) {
         add_wait(db_conn);
         dbw.backends[i].conn = db_conn;
     }
-
-
 
     pthread_t db_tid;
     int err = pthread_create(&(db_tid), NULL, start_db_worker, NULL);

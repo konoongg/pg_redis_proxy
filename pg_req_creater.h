@@ -14,6 +14,7 @@ typedef struct bd_req_attr  bd_req_attr;
 
 char* create_pg_del(int count, char** keys, int* keys_size);
 char* create_pg_get(char* key, int key_Size);
+char* create_pg_set(char*  table, cache_data* data);
 
 enum attr_parser {
     TABLE,
