@@ -19,7 +19,7 @@ int delete_cache(char* key, int key_size);
 void set_cache(cache_data* new_data);
 void free_cache(void);
 void init_cache(void);
-values* get_cache(char* key, int key_size);
+value* get_cache(char* key, int key_size);
 
 struct cache_basket {
     cache_data* first;

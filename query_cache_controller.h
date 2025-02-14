@@ -23,11 +23,11 @@ enum com_reason {
 
 struct command_to_db {
     char* cmd;
-    connection* conn;
-    command_to_db* next;
+    char* key;
     char* table;
     com_reason reason;
-    char* key;
+    command_to_db* next;
+    connection* conn;
     int key_size;
 };
 
@@ -38,9 +38,10 @@ struct list_command {
 };
 
 struct db_worker {
-    list_command* commands;
     backend* backends;
     int count_backends;
+    list_command* commands;
+    pthread_spinlock_t* lock;
     wthread* wthrd;
 };
 

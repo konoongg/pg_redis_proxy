@@ -56,7 +56,7 @@ process_result do_ping(client_req* req, answer* answ, connection* conn) {
 process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
     char* key = cl_req->argv[1];
     int key_size = cl_req->argv_size[1];
-    values* v = get_cache(key, key_size);
+    value* v = get_cache(key, key_size);
 
     if (v == NULL) {
         char* table_name = get_table_name(key);

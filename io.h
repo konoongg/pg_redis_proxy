@@ -13,6 +13,24 @@ typedef struct requests requests;
 void answer_free(void* data);
 void io_read_free(void* data);
 
+#define free_answer(answ) \
+    if (answ != NULL) { \
+        free(answ->answer); \
+        free(answ); \
+        answ = NULL; \
+    }
+
+#define free_cl_req(req) \
+    if (req != NULL) { \
+        for (int i = 0; i < req->argc; ++i) { \
+            free(req->argv[i]); \
+        } \
+        free(req->argv); \
+        free(req); \
+        req = NULL; \
+    }
+
+
 /* status finish parsing
  * NOT_ALL - Need more data, wait data and reading
  * */

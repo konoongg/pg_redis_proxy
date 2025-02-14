@@ -3,6 +3,6 @@
 
 #include "connection.h"
 
-void init_workers();
+void init_workers(void);
 
 #endif

@@ -56,11 +56,11 @@ struct connection {
     conn_status status;
     connection* next;
     connection* prev;
-    int fd;
-    proc_status (*proc)(wthread* wthrd, connection* data);
     event_data* r_data;
-    void* data; // not free data
     event_data* w_data;
+    int fd;
+    proc_status (*proc)(connection* conn);
+    void* data; // not free data
     wthread* wthrd;
 };
 
@@ -72,10 +72,11 @@ struct conn_list {
 struct wthread {
     conn_list* active;
     conn_list* wait;
-    int active_size;
-    int wait_size;
-    int efd;
     event_loop* l;
+    int active_size;
+    int efd;
+    int listen_socket;
+    int wait_size;
     pthread_spinlock_t* lock;
 };
 

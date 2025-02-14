@@ -2,22 +2,6 @@
 
 #include "io.h"
 
-#define free_answer(answ) \
-    if (answ != NULL) { \
-        free(answ->answer); \
-        free(answ); \
-        answ = NULL; \
-    }
-
-#define free_cl_req(req) \
-    if (req != NULL) { \
-        for (int i = 0; i < req->argc; ++i) { \
-            free(req->argv[i]); \
-        } \
-        free(req->argv); \
-        free(req); \
-        req = NULL; \
-    }
 
 void answer_free(void* data) {
     answer_list* a_list = (answer_list*)data;

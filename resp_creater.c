@@ -102,28 +102,49 @@ void create_bulk_string_resp(answer* answ, char* src, int size) {
     memcpy(answ->answer + index, crlf, 2);
 }
 
-void create_array_resp(answer* answ, values* res) {
+void create_array_resp(answer* answ, value* res) {
     int index = 0;
-    char str_size_array[MAX_STR_NUM_SIZE];
-    int answ_size;\
+    char count_tuple_str[MAX_STR_NUM_SIZE];
+    char count_field_str[MAX_STR_NUM_SIZE];
+    int answ_size;
     answer* sub_answers;
 
-    snprintf(str_size_array, MAX_STR_NUM_SIZE, "%d", res->count_attr);
+    snprintf(count_tuple_str, MAX_STR_NUM_SIZE, "%d", res->count_tuples);
+    snprintf(count_field_str, MAX_STR_NUM_SIZE, "%d", res->count_fields);
 
-    answ_size = strlen(str_size_array) + 1 + 2; //*<size>\r\n
-    sub_answers = wcalloc(res->count_attr * sizeof(sub_answers));
+    answ_size = strlen(count_tuple_str) + 1 + 2; //*<size>\r\n
+    sub_answers = wcalloc(res->count_tuples * sizeof(answer));
 
-    for (int i = 0; i < res->count_attr; ++i) {
-        attr* a = &(res->attr[i]);
-        switch (a->type) {
-            case INT_RESP:
-                create_num_resp(&sub_answers[i], a->data->num);
-                break;
-            case STRING_RESP:
-                create_bulk_string_resp(&sub_answers[i], a->data->str.str, a->data->str.size);
-                break;
+    for (int i = 0; i < res->count_tuples; ++i) {
+        int sub_index = 0;
+        answer* sub_sub_answer = wcalloc(res->count_fields * sizeof(answer));
+        sub_answers[i].answer_size = 1 +  strlen(count_field_str) + 2; // *<count_column>\r\n<answ>
+        for (int j = 0; j < res->count_fields; ++j) {
+            attr* a = &(res->values[i][j]);
+            switch (a->type) {
+                case INT:
+                    create_num_resp(&(sub_sub_answer[j]), a->data->num);
+                    break;
+                case STRING:
+                    create_bulk_string_resp(&(sub_sub_answer[j]), a->data->str.str, a->data->str.size);
+                    break;
+            }
         }
-        answ_size +=sub_answers[i].answer_size;
+
+        sub_answers[i].answer = wcalloc(sub_answers[i].answer_size * sizeof(char));
+        sub_answers[i].answer[0] = '*';
+        sub_index++;
+        memcpy(sub_answers[i].answer + sub_index, count_field_str, strlen(count_field_str));
+        sub_index += strlen(count_field_str);
+        memcpy(sub_answers[i].answer + sub_index, crlf, 2);
+        sub_index += 2;
+        for (int j = 0; j < res->count_fields; ++j) {
+            memcpy(sub_answers[i].answer + sub_index, sub_sub_answer[j].answer, sub_sub_answer[j].answer_size);
+            sub_index += sub_sub_answer[j].answer_size;
+            free(sub_sub_answer[j].answer);
+        }
+        free(sub_sub_answer);
+        answ_size += sub_answers[i].answer_size;
     }
     answ->answer_size = answ_size;
     answ->answer = wcalloc(answ_size * sizeof(char));
@@ -131,15 +152,16 @@ void create_array_resp(answer* answ, values* res) {
     answ->answer[0] = '*';
     index++;
 
-    memcpy(answ->answer + index, str_size_array, strlen(str_size_array));
-    index += strlen(str_size_array);
+    memcpy(answ->answer + index, count_tuple_str, strlen(count_tuple_str));
+    index += strlen(count_tuple_str);
     memcpy(answ->answer + index, crlf, 2);
     index += 2;
 
-    for (int i = 0; i < res->count_attr; ++i) {
+    for (int i = 0; i < res->count_tuples; ++i) {
         memcpy(answ->answer + index, sub_answers[i].answer, sub_answers[i].answer_size);
         index += sub_answers[i].answer_size;
         free(sub_answers[i].answer);
     }
+
     free(sub_answers);
 }

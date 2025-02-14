@@ -21,42 +21,9 @@ typedef struct resp_int_arg resp_int_arg;
 typedef union generic_resp_arg generic_resp_arg;
 typedef struct default_resp_answer default_resp_answer;
 
-void create_array_resp(answer* answ, values* res);
+void create_array_resp(answer* answ, value* res);
 void create_num_resp(answer* answ, int num);
 void init_def_resp (void);
-
-enum resp_type {
-    INT_RESP,
-    STRING_RESP,
-    BULK_STRING_RESP,
-    ARRAY_RESP,
-};
-
-struct resp_string_arg{
-    char* src;
-};
-
-struct resp_bulk_string_arg{
-    char* src;
-    int size;
-};
-
-struct resp_array_arg{
-    int count_elem;
-    resp_type* elem_types;
-    generic_resp_arg* elem_arg;
-};
-
-struct resp_int_arg{
-    int num;
-};
-
-union generic_resp_arg {
-    resp_array_arg array_arg;
-    resp_int_arg int_arg;
-    resp_bulk_string_arg bulk_string_arg;
-    resp_string_arg string_arg;
-};
 
 struct default_resp_answer {
     answer ok;

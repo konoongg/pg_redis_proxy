@@ -106,23 +106,23 @@ char* create_pg_set(char* table, cache_data* data) {
     int columns_value_index = 0;
     int set_values_index = 0;
 
-    int columns_name_size = data->values->count_attr - 1 ; // count ','
-    int columns_value_size = data->values->count_attr - 1; // count ','
-    int set_values_size = data->values->count_attr - 1; // count ',';
-    int count_attr = data->values->count_attr;
+    int columns_name_size = data->v->count_fields - 1 ; // count ','
+    int columns_value_size = data->v->count_fields - 1; // count ','
+    int set_values_size = data->v->count_fields - 1; // count ',';
+    int count_attr = data->v->count_fields;
 
     for (int i = 0; i < count_attr; ++i) {
-        columns_name_size += strlen(data->values->attr[i].column_name);
-        set_values_size += strlen(data->values->attr[i].column_name) + 1; // +1 - =
-        switch(data->values->attr[i].type) {
+        columns_name_size += strlen(data->v->values[0][i].column_name);
+        set_values_size += strlen(data->v->values[0][i].column_name) + 1; // +1 - =
+        switch(data->v->values[0][i].type) {
             case STRING:
-                string* str = (string*)data->values->attr[i].data;
+                string* str = (string*)data->v->values[0][i].data;
                 columns_value_size += str->size + 2; // 'str'
                 set_values_size += str->size + 2; // 'str'
                 break;
             case INT:
                 char str_num[MAX_STR_NUM_SIZE];
-                int* num = (int*)data->values->attr[i].data;
+                int* num = (int*)data->v->values[0][i].data;
                 snprintf(str_num, MAX_STR_NUM_SIZE, "%d", *num);
                 set_values_size += strlen(str_num);
                 columns_value_size += strlen(str_num);
@@ -137,19 +137,19 @@ char* create_pg_set(char* table, cache_data* data) {
     set_values = wcalloc(set_values_size * sizeof(char));
 
     for (int i = 0; i < count_attr; ++i) {
-        int c_name_size = strlen(data->values->attr[i].column_name);
-        memcpy(columns_name + columns_name_index, data->values->attr[i].column_name, c_name_size);
+        int c_name_size = strlen(data->v->values[0][i].column_name);
+        memcpy(columns_name + columns_name_index, data->v->values[0][i].column_name, c_name_size);
         columns_name_index += c_name_size;
 
-        memcpy(set_values + set_values_index, data->values->attr[i].column_name, c_name_size);
+        memcpy(set_values + set_values_index, data->v->values[0][i].column_name, c_name_size);
         columns_name_index += c_name_size;
 
         memcpy(set_values + set_values_index, "=", 1);
         columns_name_index += 1;
 
-        switch(data->values->attr[i].type) {
+        switch(data->v->values[0][i].type) {
             case STRING:
-                string* str = (string*)data->values->attr[i].data;
+                string* str = (string*)data->v->values[0][i].data;
                 memcpy(columns_value + columns_value_index, "\'", 1);
                 columns_value_index += 1;
 
@@ -171,7 +171,7 @@ char* create_pg_set(char* table, cache_data* data) {
                 break;
             case INT:
                 char str_num[MAX_STR_NUM_SIZE];
-                int* num = (int*)data->values->attr[i].data;
+                int* num = (int*)data->v->values[0][i].data;
                 snprintf(str_num, MAX_STR_NUM_SIZE, "%d", *num);
 
                 memcpy(columns_value + columns_value_index, str_num, strlen(str_num));

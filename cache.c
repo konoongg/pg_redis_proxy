@@ -29,12 +29,7 @@ cache* c;
 extern config_redis config;
 
 void free_data_from_cache(cache_data* data) {
-    for (int i = 0; i < data->values->count_attr; ++i) {
-        free(data->values->attr->data);
-        free(data->values->attr);
-    }
-
-    free(data->values);
+    free_values(data->v);
     free(data->key);
     free(data);
 }
@@ -108,11 +103,11 @@ bool check_ttl(cache_data* data) {
     return true;
 }
 
-values* get_cache(char* key, int key_size) {
+value* get_cache(char* key, int key_size) {
     cache_basket* basket;
     cache_data* data;
     int err;
-    values* result;
+    value* result;
 
     result = NULL;
 
@@ -125,7 +120,7 @@ values* get_cache(char* key, int key_size) {
 
     data = find_data_in_basket(basket, key, key_size);
     if (data != NULL && check_ttl(data)) {
-        result = create_copy_data(data->values);
+        result = create_copy_data(data->v);
     }
 
     err = pthread_spin_unlock(basket->lock);
@@ -161,13 +156,10 @@ void set_cache(cache_data* new_data) {
         data->next = NULL;
         data->key_size = new_data->key_size;
         data->key = new_data->key;
-        data->values = new_data->values;
+        data->v = new_data->v;
     } else {
-        for (int i = 0; i < data->values->count_attr; ++i) {
-            free(data->values->attr[i].data);
-        }
-        free(data->values);
-        data->values = new_data->values;
+        free_values(data->v);
+        data->v = new_data->v;
     }
 
     data->last_time = time(NULL);

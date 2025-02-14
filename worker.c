@@ -24,8 +24,7 @@
 #include "socket_wrapper.h"
 #include "worker.h"
 
-
-int init_workers(void);
+proc_status notify(connection* conn);
 proc_status process_accept(connection* conn);
 proc_status process_data(connection* conn);
 proc_status process_read(connection* conn);
@@ -37,12 +36,12 @@ extern config_redis config;
 thread_local wthread wthrd;
 
 proc_status process_write(connection* conn) {
-    event_data* w_data = conn->write_data;
+    event_data* w_data = conn->w_data;
     answer_list* answers  = (answer_list*)w_data->data;
     answer* cur_answer = answers->first;
 
     while (cur_answer != NULL) {
-        int res = write(io_handle->fd, cur_answer->answer, cur_answer->answer_size);
+        int res = write(conn->fd, cur_answer->answer, cur_answer->answer_size);
         if (res == cur_answer->answer_size) {
             answer* next_answer = cur_answer->next;
             free_answer(cur_answer);
@@ -117,7 +116,7 @@ proc_status process_data(connection* conn) {
         res = process_command(cur_req, cur_answer, conn);
         if (res == DONE) {
             r_data->reqs->first = r_data->reqs->first->next;
-            free_req(cur_req);
+            free_cl_req(cur_req);
         } else if (res == DB_REQ) {
             // process_command moved conenction
             return WAIT_PROC;
@@ -131,14 +130,14 @@ proc_status process_read(connection* conn) {
     exit_status status;
     int buffer_free_size;
     int res;
-    io_read* r_data = (io_read*)conn->r_data->data;
+    io_read* io_r_data = (io_read*)conn->r_data->data;
 
-    buffer_free_size = r_data->buffer_size - r_data->cur_buffer_size;
-    res = read(conn->fd, r_data->read_buffer + r_data->cur_buffer_size, buffer_free_size);
+    buffer_free_size = io_r_data->buffer_size - io_r_data->cur_buffer_size;
+    res = read(conn->fd, io_r_data->read_buffer + io_r_data->cur_buffer_size, buffer_free_size);
 
     if (res > 0) {
-        r_data->cur_buffer_size = res;
-        status = pars_data(r_data);
+        io_r_data->cur_buffer_size = res;
+        status = pars_data(io_r_data);
         if (status == ERR) {
             conn->status = CLOSE;
             delete_active(conn);
@@ -146,9 +145,9 @@ proc_status process_read(connection* conn) {
             return DEL_PROC;
         } else if (status == ALL) {
             while (status == ALL) {
-                status = pars_data(r_data);
+                status = pars_data(io_r_data);
             }
-            stop_event(wthrd->l, r_data->handle);
+            stop_event(wthrd.l, conn->r_data->handle);
             conn->status = PROCESS;
             conn->proc = process_data;
             return ALIVE_PROC;
@@ -168,22 +167,25 @@ proc_status process_read(connection* conn) {
         finish_connection(conn);
         return DEL_PROC;
     }
+    return DEL_PROC;
 }
 
 proc_status process_accept(connection* conn) {
-    int fd;
-    connection* new_conn;
+    answer_list* a_list;
     char* read_buffer;
+    connection* new_conn;
+    int fd;
+    io_read* io_r;
     requests* reqs;
 
-    fd = accept(wthrd->listen_socket, NULL, NULL);
+    fd = accept(wthrd.listen_socket, NULL, NULL);
     if (fd == -1) {
         abort();
     }
     new_conn = create_connection(fd, &wthrd);
 
-    io_read* io_r = wcalloc(sizeof(io_r));
-    answer_list* a_list = wcalloc(sizeof(answer_list));
+    io_r = wcalloc(sizeof(io_r));
+    a_list = wcalloc(sizeof(answer_list));
 
     read_buffer = wcalloc(config.worker_conf.buffer_size * sizeof(char));
     reqs = wcalloc(sizeof(requests));
@@ -217,7 +219,7 @@ proc_status process_accept(connection* conn) {
     new_conn->status = READ;
     new_conn->proc = process_read;
 
-    start_event(wthrd->l, r_data->handle);
+    start_event(wthrd.l, new_conn->r_data->handle);
 
     move_from_active_to_wait(conn);
     return WAIT_PROC;
@@ -225,19 +227,18 @@ proc_status process_accept(connection* conn) {
 
 
 void* start_worker(void* argv) {
-    bool run;
     connection* listen_conn;
     connection* efd_conn;
 
 
     int listen_socket = init_listen_socket(config.worker_conf.listen_port, config.worker_conf.backlog_size);
-    if (wthrd.listen_socket == -1) {
+    if (listen_socket == -1) {
         abort();
     }
 
     init_wthread(&wthrd);
     wthrd.l = init_loop();
-
+    wthrd.listen_socket = listen_socket;
 
     listen_conn = create_connection(listen_socket, &wthrd);
     init_event(listen_conn, listen_conn->r_data->handle, listen_conn->fd, EVENT_READ);
@@ -245,7 +246,7 @@ void* start_worker(void* argv) {
     listen_conn->proc = process_accept;
     listen_conn->status = ACCEPT;
 
-    start_event(wthrd->l, listen_conn->r_data->handle);
+    start_event(wthrd.l, listen_conn->r_data->handle);
 
     wthrd.efd = eventfd(0, EFD_NONBLOCK);
     if (wthrd.efd == -1) {
@@ -255,12 +256,12 @@ void* start_worker(void* argv) {
     }
 
     efd_conn = create_connection(wthrd.efd, &wthrd);
-    init_event(efd_conn, listen_efd_connconn->r_data->handle, efd_conn->fd, EVENT_READ);
+    init_event(efd_conn, efd_conn->r_data->handle, efd_conn->fd, EVENT_READ);
     add_wait(efd_conn);
     efd_conn->proc = notify;
     efd_conn->status = NOTIFY;
 
-    start_event(wthrd->l, efd_conn->r_data->handle);
+    start_event(wthrd.l, efd_conn->r_data->handle);
 
     while (true) {
         CHECK_FOR_INTERRUPTS();

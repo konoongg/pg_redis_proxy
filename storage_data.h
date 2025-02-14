@@ -11,14 +11,14 @@ typedef struct cache_data cache_data;
 typedef struct req_column req_column;
 typedef struct req_table req_table;
 typedef struct string string;
-typedef struct values values;
+typedef struct value value;
 typedef union db_data db_data;
 
 req_table* create_req_by_pg(PGresult* res, char* table);
 req_table* create_req_by_resp(char* value, int value_size);
-values* create_copy_data(values* v);
+value* create_copy_data(value* v);
 void free_req(req_table* req);
-void free_values(values* v);
+void free_values(value* v);
 
 enum db_type {
     INT,
@@ -35,11 +35,6 @@ union db_data {
     string str;
 };
 
-struct values {
-    int count_attr;
-    attr* attr;
-};
-
 struct attr {
     db_data* data;
     db_type type;
@@ -47,8 +42,14 @@ struct attr {
     bool is_nullable;
 };
 
+struct value {
+    attr** values;
+    int count_fields;
+    int count_tuples;
+};
+
 struct cache_data {
-    values* values;
+    value* v;
     cache_data* next;
     char* key;
     int key_size;
@@ -63,8 +64,8 @@ struct req_column {
 
 struct req_table {
     char* table;
-    int count_field;
-    int count_tuple;
+    int count_fields;
+    int count_tuples;
     req_column** columns;
 };
 

@@ -16,6 +16,7 @@ db_worker dbw;
 extern config_redis config;
 
 command_to_db* get_command(void);
+proc_status notify_db(connection* conn);
 proc_status process_read_db(connection* conn);
 proc_status process_write_db(connection* conn);
 void free_command(command_to_db* cmd);
@@ -42,7 +43,7 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
     memcpy(cmd->key, key, key_size);
     cmd->key_size = key_size;
 
-    err = pthread_spin_lock(dbw.wthrd->lock);
+    err = pthread_spin_lock(dbw.lock);
     if (err != 0) {
         ereport(INFO, errmsg("register_command: pthread_spin_lock %s", strerror(err)));
         abort();
@@ -58,7 +59,7 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
 
     event_notify(dbw.wthrd->efd);
 
-    err = pthread_spin_unlock(dbw.wthrd->lock);
+    err = pthread_spin_unlock(dbw.lock);
     if (err != 0) {
         ereport(INFO, errmsg("register_command: pthread_spin_unlock %s", strerror(err)));
         abort();
@@ -66,7 +67,7 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
 }
 
 command_to_db* get_command(void) {
-    int err = pthread_spin_lock(dbw.wthrd->lock);
+    int err = pthread_spin_lock(dbw.lock);
     command_to_db* cmd;
 
     if (err != 0) {
@@ -82,7 +83,7 @@ command_to_db* get_command(void) {
         dbw.commands->first = dbw.commands->last = NULL;
     }
 
-    err = pthread_spin_unlock(dbw.wthrd->lock);
+    err = pthread_spin_unlock(dbw.lock);
     if (err != 0) {
         ereport(INFO, errmsg("register_command: pthread_spin_unlock %s", strerror(err)));
         abort();
@@ -113,15 +114,16 @@ proc_status process_write_db(connection* conn) {
 proc_status process_read_db(connection* conn) {
     backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
-
+    int err;
     req_table* req;
     db_oper_res res = read_from_db(back->conn_with_db, cmd->table, &req);
+
     if (res == READ_OPER_RES) {
         back->is_free = true;
         move_from_active_to_wait(conn);
         move_from_wait_to_active(cmd->conn);
 
-        command_to_db* cmd = conn->w_data->data;
+        cmd = conn->w_data->data;
         event_notify(cmd->conn->wthrd->efd);
 
         if (cmd->reason == CACHE_UPDATE) {
@@ -134,7 +136,7 @@ proc_status process_read_db(connection* conn) {
 
         free_command(cmd);
 
-        int err = pthread_spin_lock(dbw.lock);
+        err = pthread_spin_lock(dbw.lock);
         if (err != 0) {
             ereport(INFO, errmsg("process_read_db: pthread_spin_lock %s", strerror(err)));
             abort();
@@ -142,7 +144,7 @@ proc_status process_read_db(connection* conn) {
 
         event_notify(conn->wthrd->efd);
 
-        int err = pthread_spin_unlock(dbw.lock);
+        err = pthread_spin_unlock(dbw.lock);
         if (err != 0) {
             ereport(INFO, errmsg("process_read_db: pthread_spin_unlock %s", strerror(err)));
             abort();
@@ -153,7 +155,6 @@ proc_status process_read_db(connection* conn) {
         move_from_active_to_wait(conn);
         return WAIT_PROC;
     } else  if (res == ERR_OPER_RES) {
-        free_connection(dbw.backends);
         abort();
     }
     return DEL_PROC;
@@ -175,7 +176,7 @@ proc_status notify_db(connection* conn) {
         if (dbw.backends[i].is_free) {
             dbw.backends[i].is_free = false;
             move_from_wait_to_active(dbw.backends[i].conn);
-            dbw.backends[i].conn->w_data = get_command();
+            dbw.backends[i].conn->w_data->data = get_command();
             dbw.backends[i].conn->data = &(dbw.backends[i]);
             dbw.backends[i].conn->proc = process_write_db;
             dbw.backends[i].conn->status = WRITE_DB;
@@ -193,17 +194,37 @@ cache_data* init_cache_data(char* key, int key_size, req_table* args) {
     cache_data* data = wcalloc(sizeof(cache_data));
     data->key = wcalloc(key_size * sizeof(char));
     data->key_size = key_size;
-    data->values = wcalloc(sizeof(values));
-    data->values->count_attr = args->count_args;
-    data->values->attr = wcalloc(args->count_args * sizeof(attr));
-    for (int i = 0; i < args->count_args; ++i) {
-        int column_name_Size = strlen(args->args[i].column_name);
-        column* c = get_column_info(args->table, args->args[i].column_name);
-        req_column* attr = &(data->values->attr[i]);
-        attr->type = c->type;
-        memcpy(attr->data, args->attr[i].data, args->attr[i].data_size);
-        attr->column_name = wcalloc(column_name_Size * sizeof(char));
-        memcpy(attr->column_name, args->args[i].column_name, column_name_Size);
+
+    data->v = wcalloc(sizeof(value));
+    data->v->count_fields = args->count_fields;
+    data->v->count_tuples = args->count_tuples;
+    data->v->values = wcalloc(args->count_tuples * sizeof(attr*));
+
+    for (int i = 0; i < args->count_tuples; ++i) {
+        data->v->values[i] = wcalloc(args->count_fields * sizeof(attr));
+        for (int j = 0; j < args->count_fields; ++j ) {
+            column* c = get_column_info(args->table, args->columns[i][j].column_name);
+            int column_name_Size = strlen(c->column_name) + 1;
+            attr* a = &(data->v->values[i][j]);
+            a->type = c->type;
+            a->column_name = wcalloc(column_name_Size * sizeof(char) );
+            memcpy(a->column_name, args->columns[i][j].column_name, column_name_Size);
+            a->is_nullable = c->is_nullable;
+
+
+            a->data = wcalloc(sizeof(db_data));
+            switch (a->type)
+            {
+                case INT:
+                    a->data->num = (int)strtol(args->columns[i][j].data, NULL, 10);
+                    break;
+                case STRING:
+                    a->data->str.size = args->columns[i][j].data_size;
+                    a->data->str.str = wcalloc(a->data->str.size * sizeof(char));
+                    memcpy(a->data->str.str, args->columns[i][j].data, a->data->str.size );
+                    break;
+            }
+        }
     }
     return data;
 }
@@ -235,6 +256,13 @@ void init_db_worker(void) {
     dbw.wthrd = wcalloc(sizeof(wthread));
     init_wthread(dbw.wthrd);
     dbw.wthrd->l = init_loop();
+
+    dbw.lock = wcalloc(sizeof(pthread_spinlock_t));
+    err = pthread_spin_init(dbw.lock, PTHREAD_PROCESS_PRIVATE);
+    if (err != 0) {
+        ereport(INFO, errmsg("init_wthread: pthread_spin_lock %s", strerror(err)));
+        abort();
+    }
 
     dbw.wthrd->efd = eventfd(0, EFD_NONBLOCK);
     if (dbw.wthrd->efd == -1) {
