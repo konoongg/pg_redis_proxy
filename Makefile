@@ -1,27 +1,35 @@
 #contrib/pg_redis_proxy/Makefile
 
-
 MODULE_big = pg_redis_proxy
+
 OBJS = \
 	$(WIN32RES) \
+	alloc.o \
+	cache.o \
+	command_processor.o \
+	config.o \
+	connection.o \
+	data_parser.o \
+	db.o \
+	event.o \
+	hash.o \
+	io.o \
+	pg_req_creater.o \
+	query_cache_controller.o \
 	redis_proxy.o \
-	work_with_socket/work_with_socket.o \
-	redis_reqv_converter/redis_reqv_converter.o \
-	configure_proxy/configure_proxy.o \
-	work_with_db/work_with_db.o \
-	postgres_reqv_converter/postgres_reqv_converter.o \
-	proxy_hash/proxy_hash.o \
-	send_req_postgres/send_req_postgres.o \
-	logger/logger.o
+	resp_creater.o \
+	socket_wrapper.o \
+	storage_data.o \
+	worker.o
 
 
 EXTENSION = pg_redis_proxy
-DATA = pg_redis_proxy--1.0.sql
+DATA = pg_redis_proxy--1.1.sql
 
-SHLIB_LINK += -lpq -lev
-PG_CPPFLAGS = -lpq -lev
+SHLIB_LINK += -lev -I/home/konoongg/home/postgres/install/include -lpq
+PG_CPPFLAGS += -lev -I/home/konoongg/home/postgres/install/include -lpq
 
-override CPPFLAGS += -I$(CURDIR)/redis_reqv_parser  -I$(CURDIR)/redis_reqv_converter -I$(CURDIR)configure_proxy -I/usr/include/postgresql
+
 
 ifdef USE_PGXS
 	PG_CONFIG = pg_config
