@@ -38,7 +38,8 @@ int init_listen_socket(int listen_port, int backlog_size) {
     struct sockaddr_in sockaddr;
 
     if (listen_socket == -1) {
-        ereport(INFO, errmsg("init_listen_socket: err socket()"));
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("init_listen_socket: err socket - %s", err));
         return -1;
     }
 

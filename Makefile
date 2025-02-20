@@ -8,6 +8,7 @@ OBJS = \
 	cache.o \
 	command_processor.o \
 	config.o \
+	connection.o \
 	data_parser.o \
 	db.o \
 	event.o \

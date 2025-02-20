@@ -36,6 +36,7 @@ extern config_redis config;
 thread_local wthread wthrd;
 
 proc_status process_write(connection* conn) {
+    ereport(INFO, errmsg("process_write: START"));
     event_data* w_data = conn->w_data;
     answer_list* answers  = (answer_list*)w_data->data;
     answer* cur_answer = answers->first;
@@ -51,7 +52,6 @@ proc_status process_write(connection* conn) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return ALIVE_PROC;
             }
-
             delete_active(conn);
             finish_connection(conn);
             return DEL_PROC;
@@ -63,11 +63,14 @@ proc_status process_write(connection* conn) {
     }
     answers->first = answers->last = NULL;
 
+    ereport(INFO, errmsg("process_write: start reader"));
     start_event(conn->wthrd->l, conn->r_data->handle);
+    ereport(INFO, errmsg("process_write: stop writer"));
     stop_event(conn->wthrd->l, conn->w_data->handle);
 
-
     move_from_active_to_wait(conn);
+    conn->proc = process_read;
+    ereport(INFO, errmsg("process_write: FINISH"));
     return WAIT_PROC;
 }
 
@@ -88,17 +91,19 @@ proc_status notify(connection* conn) {
 }
 
 proc_status process_data(connection* conn) {
+    ereport(INFO, errmsg("process_data: START"));
     io_read* r_data = (io_read*)conn->r_data->data;
     answer_list* w_data = (answer_list*)conn->w_data->data;
     client_req* cur_req;
     answer* cur_answer;
 
-     while (true) {
+    while (true) {
         process_result res;
         cur_req = r_data->reqs->first;
         if (cur_req == NULL) {
             conn->status = WRITE;
             conn->proc = process_write;
+            ereport(INFO, errmsg("process_data: start writer"));
             start_event(conn->wthrd->l, conn->w_data->handle);
 
             move_from_active_to_wait(conn);
@@ -118,7 +123,6 @@ proc_status process_data(connection* conn) {
             r_data->reqs->first = r_data->reqs->first->next;
             free_cl_req(cur_req);
         } else if (res == DB_REQ) {
-            // process_command moved conenction
             return WAIT_PROC;
         } else if  (res == PROCESS_ERR) {
             abort();
@@ -127,6 +131,7 @@ proc_status process_data(connection* conn) {
 }
 
 proc_status process_read(connection* conn) {
+    ereport(INFO, errmsg("process_read: START"));
     exit_status status;
     int buffer_free_size;
     int res;
@@ -134,7 +139,6 @@ proc_status process_read(connection* conn) {
 
     buffer_free_size = io_r_data->buffer_size - io_r_data->cur_buffer_size;
     res = read(conn->fd, io_r_data->read_buffer + io_r_data->cur_buffer_size, buffer_free_size);
-
     if (res > 0) {
         io_r_data->cur_buffer_size = res;
         status = pars_data(io_r_data);
@@ -150,17 +154,19 @@ proc_status process_read(connection* conn) {
             stop_event(wthrd.l, conn->r_data->handle);
             conn->status = PROCESS;
             conn->proc = process_data;
+
+            ereport(INFO, errmsg("process_read: FINISH ALIVE"));
             return ALIVE_PROC;
         } else if (status == NOT_ALL) {
             move_from_active_to_wait(conn);
             return WAIT_PROC;
         }
     } else if (res == 0) {
+        ereport(INFO, errmsg("process_read: close conenction"));
         conn->status = CLOSE;
         delete_active(conn);
         finish_connection(conn);
         return DEL_PROC;
-
     } else if (res < 0) {
         conn->status = CLOSE;
         delete_active(conn);
@@ -171,6 +177,7 @@ proc_status process_read(connection* conn) {
 }
 
 proc_status process_accept(connection* conn) {
+    ereport(INFO, errmsg("process_accept: START"));
     answer_list* a_list;
     char* read_buffer;
     connection* new_conn;
@@ -184,7 +191,7 @@ proc_status process_accept(connection* conn) {
     }
     new_conn = create_connection(fd, &wthrd);
 
-    io_r = wcalloc(sizeof(io_r));
+    io_r = wcalloc(sizeof(io_read));
     a_list = wcalloc(sizeof(answer_list));
 
     read_buffer = wcalloc(config.worker_conf.buffer_size * sizeof(char));
@@ -194,7 +201,6 @@ proc_status process_accept(connection* conn) {
 
     a_list->first = a_list->last = NULL;
 
-
     io_r->cur_buffer_size = 0;
     io_r->pars.cur_count_argv = 0;
     io_r->pars.cur_size_str = 0;
@@ -202,6 +208,7 @@ proc_status process_accept(connection* conn) {
     io_r->pars.parsing_str = NULL;
     io_r->pars.size_str = 0;
     io_r->read_buffer = read_buffer;
+    io_r->buffer_size = config.worker_conf.buffer_size;
     io_r->pars.cur_read_status = ARRAY_WAIT;
     io_r->reqs = reqs;
 
@@ -218,6 +225,7 @@ proc_status process_accept(connection* conn) {
 
     new_conn->status = READ;
     new_conn->proc = process_read;
+    ereport(INFO, errmsg("process_read: new_conn %p", new_conn));
 
     start_event(wthrd.l, new_conn->r_data->handle);
 
@@ -246,6 +254,9 @@ void* start_worker(void* argv) {
     listen_conn->proc = process_accept;
     listen_conn->status = ACCEPT;
 
+
+    ereport(INFO, errmsg("start_worker: listen_conn %p", listen_conn));
+
     start_event(wthrd.l, listen_conn->r_data->handle);
 
     wthrd.efd = eventfd(0, EFD_NONBLOCK);
@@ -262,6 +273,8 @@ void* start_worker(void* argv) {
     efd_conn->status = NOTIFY;
 
     start_event(wthrd.l, efd_conn->r_data->handle);
+
+    ereport(INFO, errmsg("start_worker:  efd_conn %p",  efd_conn));
 
     while (true) {
         CHECK_FOR_INTERRUPTS();

@@ -26,6 +26,7 @@ void replace_part_of_buffer(io_read* data, int cur_buffer_index) {
  * parsing will continue correctly.
  */
 exit_status pars_data(io_read* data) {
+    ereport(INFO, errmsg("pars_data: START"));
     int cur_buffer_index  = 0;
     for (; cur_buffer_index < data->cur_buffer_size; ++cur_buffer_index) {
         char c = data->read_buffer[cur_buffer_index];
@@ -73,11 +74,12 @@ exit_status pars_data(io_read* data) {
 
             if (data->pars.cur_size_str == data->pars.size_str) {
                 data->pars.parsing_str[data->pars.size_str] = '\0';
-
+                ereport(INFO, errmsg("pars_data: data->pars.parsing_str %s", data->pars.parsing_str));
                 new_str = (char*)wcalloc((data->pars.size_str + 1) * sizeof(char));
 
                 memcpy(new_str, data->pars.parsing_str, data->pars.size_str + 1);
                 data->reqs->last->argv[data->pars.cur_count_argv] = new_str;
+                ereport(INFO, errmsg("pars_data: data->reqs->last->argv[%d] %s", data->pars.cur_count_argv,data->reqs->last->argv[data->pars.cur_count_argv] ));
                 data->reqs->last->argv_size[data->pars.cur_count_argv] = data->pars.cur_size_str;
                 free(data->pars.parsing_str);
                 data->pars.parsing_str = NULL;
@@ -96,8 +98,10 @@ exit_status pars_data(io_read* data) {
         } else if(cur_status == END) {
             replace_part_of_buffer(data, cur_buffer_index);
             data->pars.cur_read_status = ARRAY_WAIT;
+            ereport(INFO, errmsg("pars_data: FINISH ALL"));
             return ALL;
         } else {
+            ereport(INFO, errmsg("pars_data: FINISH ERR"));
             return ERR;
         }
     }
@@ -105,6 +109,7 @@ exit_status pars_data(io_read* data) {
     if(data->pars.cur_read_status == END) {
         data->pars.cur_read_status = ARRAY_WAIT;
         replace_part_of_buffer(data, cur_buffer_index);
+        ereport(INFO, errmsg("pars_data: data->reqs->last %p", data->reqs->last));
         return ALL;
     }
 

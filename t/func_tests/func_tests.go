@@ -56,10 +56,6 @@ func (conn *TestConn) Close() {
 	if err != nil {
 		fmt.Println("error cache drop exec: %w", err)
 	}
-	_, err = conn.connToPG.Exec(simpleDropQuery)
-	if err != nil {
-		fmt.Println("error postgres drop exec: %w", err)
-	}
 
 	err = conn.connToPG.Close()
 	if err != nil {
@@ -83,11 +79,6 @@ func (conn *TestConn) Open() error {
 	conn.connToPG, err = sql.Open("postgres", psqlInfo)
 	if err != nil {
 		return fmt.Errorf("error connect to postgres: %w", err)
-	}
-
-	_, err = conn.connToPG.Exec(simpleCreateQuery)
-	if err != nil {
-		return fmt.Errorf("error postgres create exec: %w", err)
 	}
 
 	return nil
@@ -296,10 +287,11 @@ func escapeSpecialChars(data []byte) string {
 func main() {
 
 	tests := []Test{
-		// {
-		// 	testName: "simple set test",
-		// 	callback: simpleSetTest,
-		// },
+		{
+			testName: "simple set test",
+			callback: simpleSetTest,
+		},
+
 		// {
 		// 	testName: "simple sel test x2",
 		// 	callback: simpleSetTest_x2,
@@ -312,10 +304,10 @@ func main() {
 		// 	testName: "simple del test",
 		// 	callback: simpleDelTest,
 		// },
-		{
-			testName: "double del test",
-			callback: doubleDelTest,
-		},
+		// {
+		// 	testName: "double del test",
+		// 	callback: doubleDelTest,
+		// },
 		// {
 		// 	testName: "simple del test x2",
 		// 	callback: simpleDelTest_x2,

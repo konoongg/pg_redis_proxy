@@ -42,7 +42,7 @@ void init_cache(void) {
     storage = c->storage;
 
     c->count_basket = config.c_conf.count_basket;
-    storage->hash_func = siphash;
+    storage->hash_func = murmur_hash_2;
     storage->kv = wcalloc(c->count_basket * sizeof(cache_basket));
 
     for (int i = 0; i < c->count_basket; ++i) {
@@ -133,17 +133,21 @@ value* get_cache(char* key, int key_size) {
 }
 
 void set_cache(cache_data* new_data) {
+    ereport(INFO, errmsg("set_cache: START"));
     cache_basket* basket;
     cache_data* data;
     int err;
 
+    ereport(INFO, errmsg("set_cache: get_basket"));
     basket = get_basket(new_data->key, new_data->key_size);
 
+    ereport(INFO, errmsg("set_cache: try lock"));
     err = pthread_spin_lock(basket->lock);
     if (err != 0) {
         ereport(INFO, errmsg("get_cache: pthread_spin_lock %s", strerror(err)));
         abort();
     }
+     ereport(INFO, errmsg("set_cache: suc lock"));
 
     data = find_data_in_basket(basket, new_data->key, new_data->key_size);
     if (data == NULL) {
@@ -174,6 +178,7 @@ void set_cache(cache_data* new_data) {
         ereport(INFO, errmsg("set_cache: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
+    ereport(INFO, errmsg("set_cache: END"));
 }
 
 int delete_cache(char* key, int key_size) {

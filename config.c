@@ -14,32 +14,34 @@ void defalt_setting_init(void);
 extern config_redis config;
 
 void defalt_setting_init(void) {
-    FILE* fp;
-    int res;
+    // FILE* fp;
+    // int res;
 
     config.c_conf.count_basket = 100000;
     config.c_conf.databases = 16;
     config.c_conf.mm_policy = noeviction;
     config.c_conf.ttl_s = 5;
 
-    fp = fopen("/dev/urandom","r");
-    if (fp == NULL) {
-        char* err = strerror(errno);
-        ereport(INFO, errmsg("defalt_setting_init: fopen error %s", err));
-        abort();
-    }
-    res = fread(&(config.c_conf.seed), sizeof(uint8_t),1 , fp);
+    config.c_conf.seed = 101;
 
-    if (res != 1) {
-        ereport(INFO, errmsg("defalt_setting_init: fread error"));
-        abort();
-    }
+    // fp = fopen("/dev/urandom","r");
+    // if (fp == NULL) {
+    //     char* err = strerror(errno);
+    //     ereport(INFO, errmsg("defalt_setting_init: fopen error %s", err));
+    //     abort();
+    // }
+    // res = fread(&(config.c_conf.seed), sizeof(uint8_t),1 , fp);
 
-    if (fclose(fp) == 0) {
-        char* err = strerror(errno);
-        ereport(INFO, errmsg("defalt_setting_init: fclose error %s", err));
-        abort();
-    }
+    // if (res != 1) {
+    //     ereport(INFO, errmsg("defalt_setting_init: fread error"));
+    //     abort();
+    // }
+
+    // if (fclose(fp) == 0) {
+    //     char* err = strerror(errno);
+    //     ereport(INFO, errmsg("defalt_setting_init: fclose error %s", err));
+    //     abort();
+    // }
 
     config.worker_conf.backlog_size = 512;
     config.worker_conf.buffer_size = 512;

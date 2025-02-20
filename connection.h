@@ -19,12 +19,12 @@ void add_wait(connection* conn);
 void delete_active(connection* conn);
 void delete_wait(connection* conn);
 void event_notify(int fd);
+void finish_connection(connection* conn);
 void free_connection(connection* conn);
 void init_wthread(wthread* wthrd);
 void loop_step(wthread* wthrd);
 void move_from_active_to_wait(connection* conn);
 void move_from_wait_to_active(connection* conn);
-
 
 struct event_data {
     void* data;

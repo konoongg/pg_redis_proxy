@@ -27,10 +27,12 @@ void init_event(void* data, handle* h, int fd, event_mode mode) {
 }
 
 void start_event(event_loop* l, handle* h) {
+    ereport(INFO, errmsg("stop_event: l->loop %p, h->handle %p", l->loop, (struct ev_io*)h->handle ));
     ev_io_start(l->loop, (struct ev_io*)h->handle);
 }
 
 void stop_event(event_loop* l, handle* h) {
+    ereport(INFO, errmsg("stop_event: l->loop %p, h->handle %p", l->loop, (struct ev_io*)h->handle ));
     ev_io_stop(l->loop, (struct ev_io*)h->handle);
 }
 

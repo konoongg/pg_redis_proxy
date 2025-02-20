@@ -68,12 +68,12 @@ req_table* create_req_by_resp(char* value, int value_size) {
     int cur_count_attr;
 
     req->count_fields = 1;
+    req->count_tuples = 1;
     for (int i = 0; i < value_size; ++i) {
         if (value[i] == config.p_conf.delim) {
             req->count_fields++;
         }
     }
-
     req->columns = wcalloc(sizeof(req_column*));
     req->columns[0] = wcalloc(req->count_fields * sizeof(req_column));
 
@@ -155,7 +155,7 @@ req_table* create_req_by_pg(PGresult* res, char* table) {
 }
 
 void free_req(req_table* req) {
-    for (int row = 0; row < req->count_fields; ++row) {
+    for (int row = 0; row < req->count_tuples; ++row) {
         for (int column = 0; column < req->count_fields; ++column) {
             free(req->columns[row][column].data);
         }

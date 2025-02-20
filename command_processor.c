@@ -8,6 +8,7 @@
 #include "alloc.h"
 #include "cache.h"
 #include "command_processor.h"
+#include "connection.h"
 #include "hash.h"
 #include "io.h"
 #include "pg_req_creater.h"
@@ -54,6 +55,8 @@ process_result do_ping(client_req* req, answer* answ, connection* conn) {
 }
 
 process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
+    ereport(INFO, errmsg("do_get: START"));
+
     char* key = cl_req->argv[1];
     int key_size = cl_req->argv_size[1];
     value* v = get_cache(key, key_size);
@@ -63,7 +66,7 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
         char* req_to_db = create_pg_get(key, key_size);
 
         move_from_active_to_wait(conn);
-        register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
+        //register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
         return DB_REQ;
     }
@@ -74,14 +77,15 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
 }
 
 process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
+    ereport(INFO, errmsg("do_set: START"));
     char* key = cl_req->argv[1];
     char* value = cl_req->argv[2];
     int key_size = cl_req->argv_size[1];
     int value_size = cl_req->argv_size[2];
     req_table* new_req  = create_req_by_resp(value, value_size);
+    new_req->table = get_table_name(key);
     cache_data* data = init_cache_data(key, key_size, new_req);
-    char* table_name = get_table_name(key);
-    char* req_to_db = create_pg_set(table_name, data);
+    char* req_to_db = create_pg_set(new_req->table, data);
 
     set_cache(data);
 
@@ -89,12 +93,14 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     answ->answer = wcalloc(answ->answer_size  * sizeof(char));
     memcpy(answ->answer, def_resp.ok.answer, answ->answer_size);
 
-    move_from_active_to_wait(conn);
-    register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
+    //move_from_active_to_wait(conn);
+    //register_command(new_req->table, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
     free_req(new_req);
     free_cache_data(data);
-    return DB_REQ;
+    ereport(INFO, errmsg("do_set: FINISH"));
+    return DONE;
+    //return DB_REQ;
 }
 
 process_result do_del(client_req* cl_req, answer* answ, connection* conn) {
@@ -118,7 +124,7 @@ process_result do_del(client_req* cl_req, answer* answ, connection* conn) {
 
     table_name = get_table_name(key);
     req_to_db = create_pg_del(count_del_keys, del_keys, size_del_keys);
-    register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
+    //register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
     create_num_resp(answ, count_del);
     return DB_REQ;
@@ -161,10 +167,12 @@ process_result process_command(client_req* req, answer* answ, connection* conn) 
     int hash;
     int size_command_name;
 
+
+    ereport(INFO, errmsg("process_command: req->argc %d req->argv[0] %s", req->argc, req->argv[0]));
+
     hash = com_dict->hash_func(req->argv[0]);
     size_command_name = strlen(req->argv[0]) + 1;
     cur_command = com_dict->commands[hash]->first;
-
     while (cur_command != NULL) {
         if (strncmp(cur_command->command->name, req->argv[0], size_command_name) == 0) {
             return cur_command->command->func(req, answ, conn);

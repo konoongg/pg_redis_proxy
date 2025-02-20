@@ -132,21 +132,23 @@ column* get_column_info(char* table_name, char* column_name) {
             }
         }
     }
+
     return NULL;
 }
 
 
 void init_db(backend* back) {
+    ereport(INFO, errmsg("init_db: START"));
     init_meta_data();
     connect_to_db(back);
 }
 
 void init_meta_data(void) {
+    ereport(INFO, errmsg("init_meta_data: START"));
     PGresult* res;
     PGconn* conn;
     char* conn_info;
     const char* query;
-
     conn_info = create_conn_req();
     conn = PQconnectdb(conn_info);
     free(conn_info);
@@ -163,14 +165,17 @@ void init_meta_data(void) {
     }
 
     meta->count_tables = PQntuples(res);
+
+    ereport(INFO, errmsg("init_meta_data: meta->count_tables %d", meta->count_tables));
     meta->tables = wcalloc(meta->count_tables * sizeof(table));
     for (int i = 0; i < meta->count_tables; ++i) {
         char* table_name = PQgetvalue(res, i, 0);
         int name_size = PQgetlength(res, i, 0);
+        meta->tables[i].name = wcalloc( (name_size + 1) * sizeof(char));
         memcpy(meta->tables[i].name, table_name, name_size);
+        meta->tables[i].name[name_size] = '\0';
     }
     PQclear(res);
-
     for (int i = 0; i < meta->count_tables; ++i) {
         table* t = &(meta->tables[i]);
         query = create_t_info_req(t->name);
@@ -190,11 +195,31 @@ void init_meta_data(void) {
             char* type = PQgetvalue(res, c, 1);
             int column_name_size = PQgetlength(res, c, 0);
 
-            t->columns[c].column_name = wcalloc(column_name_size * sizeof(char));
+            t->columns[c].column_name = wcalloc((column_name_size + 1) * sizeof(char));
             memcpy(t->columns[c].column_name, column_name, column_name_size );
+            t->columns[c].column_name[column_name_size] = '\0';
 
-            ereport(INFO, errmsg("init_meta_data:  type: %s is_nullable: %s", type, is_nullable));
+            if (strncmp(type, "text", 4) == 0) {
+                t->columns[c].type = STRING;
+            } else if (strncmp(type, "integer", 7) == 0) {
+                t->columns[c].type = INT;
+            } else {
+                ereport(INFO, errmsg("init_meta_data: undefined type: %s", type));
+                PQclear(res);
+                PQfinish(conn);
+                abort();
+            }
 
+            if (strncmp(is_nullable, "NO", 2)) {
+                t->columns[c].is_nullable = false;
+            } else if (strncmp(is_nullable, "YES", 3)) {
+                t->columns[c].is_nullable = true;
+            } else {
+                ereport(INFO, errmsg("init_meta_data: undefined nullable: %s", is_nullable));
+                PQclear(res);
+                PQfinish(conn);
+                abort();
+            }
         }
         PQclear(res);
     }

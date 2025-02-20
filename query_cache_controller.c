@@ -19,10 +19,10 @@ command_to_db* get_command(void);
 proc_status notify_db(connection* conn);
 proc_status process_read_db(connection* conn);
 proc_status process_write_db(connection* conn);
-void free_command(command_to_db* cmd);
+void free_db_command(command_to_db* cmd);
 void* start_db_worker(void*);
 
-void free_command(command_to_db* cmd) {
+void free_db_command(command_to_db* cmd) {
     free(cmd->key);
     free(cmd->table);
     free(cmd->cmd);
@@ -134,7 +134,7 @@ proc_status process_read_db(connection* conn) {
             free_cache_data(data);
         }
 
-        free_command(cmd);
+        free_db_command(cmd);
 
         err = pthread_spin_lock(dbw.lock);
         if (err != 0) {
@@ -199,11 +199,15 @@ cache_data* init_cache_data(char* key, int key_size, req_table* args) {
     data->v->count_fields = args->count_fields;
     data->v->count_tuples = args->count_tuples;
     data->v->values = wcalloc(args->count_tuples * sizeof(attr*));
-
     for (int i = 0; i < args->count_tuples; ++i) {
         data->v->values[i] = wcalloc(args->count_fields * sizeof(attr));
+
         for (int j = 0; j < args->count_fields; ++j ) {
             column* c = get_column_info(args->table, args->columns[i][j].column_name);
+            if (c == NULL) {
+                ereport(INFO, errmsg("init_cache_data: can't get column"));
+                abort();
+            }
             int column_name_Size = strlen(c->column_name) + 1;
             attr* a = &(data->v->values[i][j]);
             a->type = c->type;
@@ -242,6 +246,7 @@ void* start_db_worker(void*) {
 }
 
 void init_db_worker(void) {
+
     connection* efd_conn;
     int err;
     pthread_t db_tid;
@@ -260,14 +265,14 @@ void init_db_worker(void) {
     dbw.lock = wcalloc(sizeof(pthread_spinlock_t));
     err = pthread_spin_init(dbw.lock, PTHREAD_PROCESS_PRIVATE);
     if (err != 0) {
-        ereport(INFO, errmsg("init_wthread: pthread_spin_lock %s", strerror(err)));
+        ereport(INFO, errmsg("init_db_worker: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
     dbw.wthrd->efd = eventfd(0, EFD_NONBLOCK);
     if (dbw.wthrd->efd == -1) {
         char* err = strerror(errno);
-        ereport(INFO, errmsg("start_db_worker: eventfd error %s", err));
+        ereport(INFO, errmsg("init_db_worker: eventfd error %s", err));
         abort();
     }
 
@@ -285,6 +290,8 @@ void init_db_worker(void) {
         add_wait(db_conn);
         dbw.backends[i].conn = db_conn;
     }
+
+    start_event(dbw.wthrd->l,  efd_conn->r_data->handle);
 
     err = pthread_create(&(db_tid), NULL, start_db_worker, NULL);
     if (err) {
