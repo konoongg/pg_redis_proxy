@@ -6,7 +6,6 @@
 #define MAX_STR_NUM_SIZE 20
 
 typedef enum cache_mode cache_mode;
-typedef enum maxmemory_policy maxmemory_policy;
 typedef struct cache_conf cache_conf;
 typedef struct config_redis config_redis;
 typedef struct db_conn_conf db_conn_conf;
@@ -15,45 +14,35 @@ typedef struct proto_conf proto_conf;
 
 void init_config(void);
 
+
 struct init_worker_conf {
-    int backlog_size;
-    int buffer_size;
+    int backlog_size; // listen socket backlog
+    int buffer_size; // read buffer size
     int count_worker;
     int listen_port;
 };
 
-enum maxmemory_policy {
-    noeviction,
-};
-
-enum cache_mode {
-    NO_SYNC,
-    ALL_SYNC,
-};
-
 struct cache_conf {
     int count_basket;
-    int databases;
     int ttl_s;
-    maxmemory_policy mm_policy;
     uint8_t seed;
 };
 
 struct db_conn_conf {
-    int count_backend;
-    char* dbname;
-    char* user;
+    int count_backend; // count libpq connection with PostgreSQL
+    char* dbname; // The username under which the extension communicates with PostgreSQL.
+    char* user; // db use
 };
 
 struct proto_conf {
-    char delim;
+    char delim; // resp delim sym <column1>.<column2>
 };
 
 struct config_redis {
-    init_worker_conf worker_conf;
-    cache_conf c_conf;
-    db_conn_conf db_conf;
-    proto_conf p_conf;
+    init_worker_conf worker_conf; // io worker settings
+    cache_conf c_conf; // cache settings
+    db_conn_conf db_conf; // connection with postgres settings
+    proto_conf p_conf; // protocol settings
 };
 
 #endif

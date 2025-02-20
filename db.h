@@ -23,10 +23,10 @@ db_oper_res write_to_db (PGconn* conn, char* req);
 void finish_connects(backend* backends);
 
 enum db_oper_res {
-    READ_OPER_RES,
-    WRITE_OPER_RES,
-    WAIT_OPER_RES,
-    ERR_OPER_RES,
+    READ_OPER_RES, // Data successfully read
+    WRITE_OPER_RES, // Data successfully written
+    WAIT_OPER_RES, // Waiting, the action needs to be repeated
+    ERR_OPER_RES, // Error
 };
 
 struct backend {

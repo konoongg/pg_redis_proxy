@@ -26,6 +26,7 @@ process_result do_ping(client_req* cl_req, answer* answ, connection* conn);
 process_result do_set(client_req* cl_req, answer* answ, connection* conn);
 void free_command(int hash);
 
+// A structure mapping command names to the functions that execute them.
 redis_command commands[] = {
     {"del", do_del},
     {"get", do_get},
@@ -33,6 +34,7 @@ redis_command commands[] = {
     {"ping", do_ping}
 };
 
+// Extracting the table name from the key.
 char* get_table_name(char* key) {
     char* dot_position = strchr(key, '.');
 
@@ -47,6 +49,7 @@ char* get_table_name(char* key) {
     }
 }
 
+//In the case of receiving a PING command, send PONG back to the user.
 process_result do_ping(client_req* req, answer* answ, connection* conn) {
     answ->answer_size = def_resp.pong.answer_size;
     answ->answer = wcalloc(answ->answer_size  * sizeof(char));
@@ -54,6 +57,14 @@ process_result do_ping(client_req* req, answer* answ, connection* conn) {
     return DONE;
 }
 
+/*
+* Handling the GET command: by key, we access the cache.
+* If the data is successfully retrieved,
+* it is converted into RESP format and sent back.
+* If the data is not found,
+* we register a DB worker to fetch the data from the database
+* and return a code indicating that the client needs to wait for the data to be retrieved.
+*/
 process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
     ereport(INFO, errmsg("do_get: START"));
 
@@ -66,7 +77,7 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
         char* req_to_db = create_pg_get(key, key_size);
 
         move_from_active_to_wait(conn);
-        //register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
+        register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
         return DB_REQ;
     }
@@ -76,6 +87,14 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
     return DONE;
 }
 
+
+/*
+* Handling the SET command:
+* based on the received request,
+* new data for the cache is generated.
+* The data is updated in the cache,
+* and an event is registered to update the data in the database.
+*/
 process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     ereport(INFO, errmsg("do_set: START"));
     char* key = cl_req->argv[1];
@@ -93,16 +112,21 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     answ->answer = wcalloc(answ->answer_size  * sizeof(char));
     memcpy(answ->answer, def_resp.ok.answer, answ->answer_size);
 
-    //move_from_active_to_wait(conn);
-    //register_command(new_req->table, req_to_db, conn, CACHE_UPDATE, key, key_size);
+    move_from_active_to_wait(conn);
+    register_command(new_req->table, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
     free_req(new_req);
     free_cache_data(data);
     ereport(INFO, errmsg("do_set: FINISH"));
-    return DONE;
-    //return DB_REQ;
+    //return DONE;
+    return DB_REQ;
 }
 
+/*
+* Handling the DEL command:
+* Each provided key is removed from the cache,
+* and then an event is registered to delete the data from the database.
+*/
 process_result do_del(client_req* cl_req, answer* answ, connection* conn) {
     char** del_keys = cl_req->argv + 1;
     char* key = cl_req->argv[1];
@@ -124,7 +148,7 @@ process_result do_del(client_req* cl_req, answer* answ, connection* conn) {
 
     table_name = get_table_name(key);
     req_to_db = create_pg_del(count_del_keys, del_keys, size_del_keys);
-    //register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
+    register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
     create_num_resp(answ, count_del);
     return DB_REQ;
@@ -142,8 +166,13 @@ void free_command(int hash) {
     free(com_dict->commands[hash]);
 }
 
-void init_commands(void) {
 
+/*
+* The initialization of callback commands is taking place.
+* Initially, a mapping between the command name and the function to be called is stored.
+* A hash table is populated to establish this correspondence.
+*/
+void init_commands(void) {
     com_dict = wcalloc(sizeof(command_dict));
     com_dict->hash_func = hash_pow_31_mod_100;
     com_dict->commands = wcalloc(HASH_P_31_M_100_SIZE * sizeof(entris*));
@@ -162,6 +191,7 @@ void init_commands(void) {
     }
 }
 
+// The submitted command is identified, and the corresponding function is invoked.
 process_result process_command(client_req* req, answer* answ, connection* conn) {
     command_entry* cur_command;
     int hash;

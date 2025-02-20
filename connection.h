@@ -33,24 +33,38 @@ struct event_data {
 };
 
 enum conn_status {
-    ACCEPT,
-    CLOSE,
-    READ,
-    WRITE,
-    WAIT,
-    PROCESS,
-    NOTIFY,
+    ACCEPT, // accept connect
+    CLOSE, // close connect
+    READ, // read data from connect
+    WRITE, // write data to connect
+    PROCESS, // proccess data
+    NOTIFY, // Handling the notification that the active connections queue needs to be checked
+
+    // Similar functions for the loop running within the database worker.
     NOTIFY_DB,
     READ_DB,
     WRITE_DB,
 };
 
+
+/*
+* Function execution status:
+*
+* ALIVE_PROC: Continue processing.
+* DEL_PROC: Terminate the connection.
+* WAIT_PROC: Await processing.
+*/
 enum proc_status {
     ALIVE_PROC,
     DEL_PROC,
     WAIT_PROC,
 };
 
+/*
+* A structure describing a connection.
+* It stores information related to receiving and sending data to the user,
+* as well as the function to be called when this connection enters the active connections queue.
+*/
 struct connection {
     bool is_wait;
     conn_status status;
@@ -69,6 +83,7 @@ struct conn_list {
     connection* last;
 };
 
+//A structure describing the execution loop, containing queues for active and pending connections.
 struct wthread {
     conn_list* active;
     conn_list* wait;

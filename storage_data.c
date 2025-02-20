@@ -62,6 +62,10 @@ void free_values(value* v) {
     free(v);
 }
 
+/*
+* Creating a structure describing the cached data based on a user request,
+* specifically an array of strings.
+*/
 req_table* create_req_by_resp(char* value, int value_size) {
     req_table* req = wcalloc(sizeof(req_table));
     int start_pos;
@@ -107,6 +111,7 @@ req_table* create_req_by_resp(char* value, int value_size) {
     return req;
 }
 
+// Creating a structure describing the cached data based on data received from the database.
 req_table* create_req_by_pg(PGresult* res, char* table) {
     req_table* req = wcalloc(sizeof(req_table));
 

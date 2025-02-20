@@ -13,6 +13,8 @@ extern config_redis config;
 
 void callback(EV_P_ struct ev_io* io_handle, int revents);
 
+
+// Initialization of the event, in the current implementation, libev is used.
 void init_event(void* data, handle* h, int fd, event_mode mode) {
     int flag;
     if (mode == EVENT_READ) {
@@ -60,6 +62,10 @@ void loop_destroy(event_loop* l) {
     ev_loop_destroy((struct ev_loop*)l->loop);
 }
 
+/*
+* Calling the function to handle the event;
+* the connection is moved from the pending queue to the active queue
+*/
 void callback(EV_P_ struct ev_io* io_handle, int revents) {
     connection* conn = (connection*)io_handle->data;
     if (revents & EV_ERROR) {

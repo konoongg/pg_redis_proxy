@@ -21,6 +21,11 @@ void create_bulk_string_resp(answer* answ, char* src, int size);
 void create_err_resp(answer* answ, char* src);
 void create_simple_string_resp(answer* answ, char* src);
 
+/*
+*This file contains the functions responsible for generating the response in RESP
+*/
+
+// Initialization of standard responses from Redis
 void init_def_resp (void) {
     def_resp.ok.answer = "+OK\r\n";
     def_resp.ok.answer_size = 5;
@@ -102,6 +107,10 @@ void create_bulk_string_resp(answer* answ, char* src, int size) {
     memcpy(answ->answer + index, crlf, 2);
 }
 
+/*
+* We know that, according to the application logic, we will always return an array of arrays.
+* The nested array can contain various simple data types, such as strings or numbers
+*/
 void create_array_resp(answer* answ, value* res) {
     int index = 0;
     char count_tuple_str[MAX_STR_NUM_SIZE];

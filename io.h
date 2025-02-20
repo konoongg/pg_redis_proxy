@@ -40,6 +40,10 @@ enum exit_status {
     ALL
 };
 
+/*
+* Contains information about the client's request,
+* the number of arguments passed, and the arguments themselves.
+*/
 struct client_req {
     char** argv;
     int argc;
@@ -47,6 +51,7 @@ struct client_req {
     struct client_req* next;
 };
 
+// A structure describing the response.
 struct answer {
     char* answer;
     int answer_size;
@@ -70,6 +75,7 @@ enum read_status {
     END // skip last \n\r
 };
 
+// A parsing structure that stores information during parsing.
 struct parsing {
     char* parsing_str;
     int cur_count_argv;
@@ -85,7 +91,9 @@ struct requests {
     client_req* first;
     int count_req;
 };
-
+/*
+* A structure describing data-related reading operations, storing the read buffer, the generated queries and the parsing result.
+*/
 struct io_read {
     char* read_buffer;
     int buffer_size;

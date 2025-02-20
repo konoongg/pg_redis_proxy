@@ -25,6 +25,12 @@ void finish_connects(backend* backends) {
     }
 }
 
+/*
+* Sending a query to the database.
+* If the connection is not yet ready to write,
+* return WAIT_OPER_RES. If an error occurs, return ERR_OPER_RES.
+* If we can write the data, write itand return WRITE_OPER_RES.
+*/
 db_oper_res write_to_db(PGconn* conn, char* req) {
     if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
         return WAIT_OPER_RES;
@@ -39,6 +45,14 @@ db_oper_res write_to_db(PGconn* conn, char* req) {
     return ERR_OPER_RES;
 }
 
+
+/*
+* If the data is not yet ready to be read,
+* return WAIT_OPER_RES. If an error occurs, return ERR_OPER_RES.
+* Otherwise, read the data, create a formatted representation of the data, and return READ_OPER_RES.
+* The PQgetResult(conn) function must be called until NULL is returned.
+* In the current implementation, it is expected that all data is read at once.
+*/
 db_oper_res read_from_db(PGconn* conn, char* t, req_table** req) {
     if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
         return WAIT_OPER_RES;
@@ -50,14 +64,14 @@ db_oper_res read_from_db(PGconn* conn, char* t, req_table** req) {
 
         PQclear(res);
 
-        res = PQgetResult(conn);
-        if (res != NULL) {
-            ereport(INFO, errmsg("read_from_db: second res - error"));
+        if (*req == NULL) {
+            ereport(INFO, errmsg("read_from_db: can't get value"));
             return ERR_OPER_RES;
         }
 
-        if (*req == NULL) {
-            ereport(INFO, errmsg("read_from_db: can't get value"));
+        res = PQgetResult(conn);
+        if (res != NULL) {
+            ereport(INFO, errmsg("read_from_db: second res - error"));
             return ERR_OPER_RES;
         }
 
@@ -66,6 +80,7 @@ db_oper_res read_from_db(PGconn* conn, char* t, req_table** req) {
     return ERR_OPER_RES;
 }
 
+// Creating a connection query to PostgreSQL
 char* create_conn_req(void) {
     int conn_info_size;
     char* conn_info;
@@ -79,6 +94,7 @@ char* create_conn_req(void) {
     return conn_info;
 }
 
+//Creating a query to retrieve information about the table.
 char* create_t_info_req(char* table_name) {
     int req_size;
     char* req;
@@ -96,6 +112,7 @@ char* create_t_info_req(char* table_name) {
     return req;
 }
 
+//The server is busy. Please try again later.
 void connect_to_db(backend* backends) {
     char* conn_info = create_conn_req();
 
@@ -119,6 +136,10 @@ void connect_to_db(backend* backends) {
 
 }
 
+/*
+* Returns information about the table, the type of the specified column,
+* and whether it can be nullable, based on the table name and column name.
+*/
 column* get_column_info(char* table_name, char* column_name) {
     for (int i = 0; i < meta->count_tables; ++i) {
         table* t  = &(meta->tables[i]);
@@ -136,13 +157,13 @@ column* get_column_info(char* table_name, char* column_name) {
     return NULL;
 }
 
-
 void init_db(backend* back) {
     ereport(INFO, errmsg("init_db: START"));
     init_meta_data();
     connect_to_db(back);
 }
 
+// Retrieve all tables and their columns along with their data types.
 void init_meta_data(void) {
     ereport(INFO, errmsg("init_meta_data: START"));
     PGresult* res;
@@ -180,6 +201,7 @@ void init_meta_data(void) {
         table* t = &(meta->tables[i]);
         query = create_t_info_req(t->name);
         res = PQexec(conn, query);
+        free(query);
         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
             ereport(INFO, errmsg("SELECT failed: %s", PQerrorMessage(conn)));
             PQclear(res);

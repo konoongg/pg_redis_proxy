@@ -42,12 +42,14 @@ struct attr {
     bool is_nullable;
 };
 
+
 struct value {
     attr** values;
     int count_fields;
     int count_tuples;
 };
 
+//A data structure describing the data stored in the cache.
 struct cache_data {
     value* v;
     cache_data* next;
@@ -62,6 +64,12 @@ struct req_column {
     char* data;
 };
 
+/*
+* An intermediate data structure that is formed based
+* on data received from the database or the user.
+* Metadata about the columns is then added to it,
+* and the data for the cache is generated.
+*/
 struct req_table {
     char* table;
     int count_fields;

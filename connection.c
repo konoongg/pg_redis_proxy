@@ -14,6 +14,7 @@ void add(connection* conn, conn_list* list) ;
 void delete(connection* conn, conn_list* list);
 void free_wthread(wthread* wthrd);
 
+// Adding an element to the event list.
 void add(connection* conn, conn_list* list) {
     if (list->first == NULL) {
         conn->prev = NULL;
@@ -26,6 +27,7 @@ void add(connection* conn, conn_list* list) {
     }
 }
 
+// Removes an event from the list.
 void delete(connection* conn, conn_list* list) {
     assert(list->first);
     ereport(INFO, errmsg("delete: start conn %p", conn));
@@ -43,6 +45,13 @@ void delete(connection* conn, conn_list* list) {
     }
 }
 
+
+/*
+* Adds an element to the list of active events.
+* Locking is required because the database worker thread may also interact with this list.
+* The same applies to the function for removing from the active list,
+* functions working with the pending list, and functions for moving elements between lists.
+*/
 void add_active(connection* conn) {
     int err = pthread_spin_lock(conn->wthrd->lock);
     if (err != 0) {

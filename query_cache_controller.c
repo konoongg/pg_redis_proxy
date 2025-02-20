@@ -29,6 +29,11 @@ void free_db_command(command_to_db* cmd) {
     free(cmd);
 }
 
+/*
+* Registering a new event for database processing.
+* The event is added to the processing queue,
+* and the database worker's loop is notified via eventfd that new events have arrived.
+*/
 void register_command(char* tabl, char* req, connection* conn, com_reason reason, char* key, int key_size) {
     command_to_db* cmd = wcalloc(sizeof(command_to_db));
     int err;
@@ -66,6 +71,7 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
     }
 }
 
+// Retrieving a command for processing from the queue
 command_to_db* get_command(void) {
     int err = pthread_spin_lock(dbw.lock);
     command_to_db* cmd;
@@ -92,6 +98,7 @@ command_to_db* get_command(void) {
     return cmd;
 }
 
+// If we have a request, we send it to the database
 proc_status process_write_db(connection* conn) {
     backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
@@ -111,6 +118,15 @@ proc_status process_write_db(connection* conn) {
     return DEL_PROC;
 }
 
+
+/*
+* We attempt to read data from the database connection.
+* If successful, we move the corresponding connection
+* (which initiated the database request) to the active queue.
+* If the purpose of the query was CACHE_UPDATE,
+* we update the data in the cache and notify the database worker's
+* event loop via eventfd that we have finished using the PostgreSQL connection
+*/
 proc_status process_read_db(connection* conn) {
     backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
@@ -160,6 +176,16 @@ proc_status process_read_db(connection* conn) {
     return DEL_PROC;
 }
 
+/*
+* Notification to the loop occurs in two cases:
+*
+* If a new event appears in the request queue and
+* there is a free backend available for interacting with PostgreSQL,
+* we assign it to process this request.
+* If no free backend is available,
+* we sleep until a notification arrives that a backend has been freed.
+* Then, we assign it new work to process the request, if any exists.
+*/
 proc_status notify_db(connection* conn) {
     char code;
     int res = read(conn->fd, &code, 1);
@@ -190,6 +216,7 @@ proc_status notify_db(connection* conn) {
     return WAIT_PROC;
 }
 
+//Based on the pre-formed data information, we create data for the cache and add metadata.
 cache_data* init_cache_data(char* key, int key_size, req_table* args) {
     cache_data* data = wcalloc(sizeof(cache_data));
     data->key = wcalloc(key_size * sizeof(char));
@@ -245,6 +272,12 @@ void* start_db_worker(void*) {
     }
 }
 
+
+/*
+* Initializing the database, creating a loop to track events,
+*  including setting up a connection with eventfd
+* to monitor notifications about new tasks being added.
+*/
 void init_db_worker(void) {
 
     connection* efd_conn;

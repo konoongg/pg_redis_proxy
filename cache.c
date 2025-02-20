@@ -28,6 +28,7 @@ void free_data_from_cache(cache_data* data);
 cache* c;
 extern config_redis config;
 
+// It releases the data from the cache.
 void free_data_from_cache(cache_data* data) {
     free_values(data->v);
     free(data->key);
@@ -56,6 +57,7 @@ void init_cache(void) {
     }
 }
 
+//A function to retrieve the corresponding cache bucket based on a string.
 cache_basket* get_basket(char* key, int key_size) {
     kv_storage* storage;
     u_int64_t hash;
@@ -66,6 +68,10 @@ cache_basket* get_basket(char* key, int key_size) {
     return &(storage->kv[hash]);
 }
 
+/*
+* The function checks whether the specified bucket contains data with the provided key.
+* If the data exists, a reference to it is returned; otherwise, NULL is returned.
+*/
 cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     cache_data* data;
 
@@ -80,6 +86,10 @@ cache_data* find_data_in_basket(cache_basket* basket, char* key, int key_size) {
     return NULL;
 }
 
+/* A function to check the TTL.
+* If the data storage time has expired, the data is removed from the cache;
+* if not, the time is updated.
+*/
 bool check_ttl(cache_data* data) {
     time_t cur_time;
 
@@ -103,6 +113,11 @@ bool check_ttl(cache_data* data) {
     return true;
 }
 
+/*
+* A function to retrieve data from the cache.
+* The function copies the data and returns a pointer to the copied data if the data is found.
+* If the data does not exist or its TTL has expired, it returns NULL.
+*/
 value* get_cache(char* key, int key_size) {
     cache_basket* basket;
     cache_data* data;
@@ -132,6 +147,11 @@ value* get_cache(char* key, int key_size) {
     return result;
 }
 
+/* A function to set new data by key.
+* It accepts a structure describing the data.
+* First, it checks whether such data already exists.
+* If it does, the data is updated; if not, new data is added.
+*/
 void set_cache(cache_data* new_data) {
     ereport(INFO, errmsg("set_cache: START"));
     cache_basket* basket;

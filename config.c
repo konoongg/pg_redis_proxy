@@ -17,12 +17,10 @@ void defalt_setting_init(void) {
     // FILE* fp;
     // int res;
 
-    config.c_conf.count_basket = 100000;
-    config.c_conf.databases = 16;
-    config.c_conf.mm_policy = noeviction;
-    config.c_conf.ttl_s = 5;
+    config.c_conf.count_basket = 100000; // cache basket
+    config.c_conf.ttl_s = 5; // cache ttl
 
-    config.c_conf.seed = 101;
+    config.c_conf.seed = 101; // hash seed
 
     // fp = fopen("/dev/urandom","r");
     // if (fp == NULL) {
@@ -43,12 +41,12 @@ void defalt_setting_init(void) {
     //     abort();
     // }
 
-    config.worker_conf.backlog_size = 512;
-    config.worker_conf.buffer_size = 512;
+    config.worker_conf.backlog_size = 512; // listen socket backlog
+    config.worker_conf.buffer_size = 512; // read buffer size
     config.worker_conf.count_worker = 1;
     config.worker_conf.listen_port = 6379;
 
-    config.db_conf.count_backend = 1;
+    config.db_conf.count_backend = 1; // count libpq backend
     config.db_conf.dbname = wcalloc(9 * sizeof(char));
     config.db_conf.user = wcalloc(9 * sizeof(char));
     memcpy(config.db_conf.dbname, "postgres", 9);

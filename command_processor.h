@@ -40,11 +40,21 @@ struct entris {
     command_entry* last;
 };
 
+
+/*
+* Results of request processing:
+*
+*   DONE: The command has been executed, and further operations can proceed.
+*
+*   PROCESS_ERR: An error occurred that needs to be handled.
+*
+*   DB_REQ: During the execution of the command, a request to PostgreSQL was required,
+*   and it is necessary to wait for its response.
+*/
 enum process_result {
     DONE,
     PROCESS_ERR,
     DB_REQ,
-    NONE,
 };
 
 #endif

@@ -21,12 +21,25 @@ void free_cache(void);
 void init_cache(void);
 value* get_cache(char* key, int key_size);
 
+/*
+* A structure describing a cache bucket.
+* Locking when accessing cache data occurs at the bucket level to prevent data races
+* in case two threads attempt to add data under the same key simultaneously.
+* A spinlock is used for locking, as it is assumed
+* that the lock will be held for a short period of time
+* and that key collisions will be rare.
+*/
 struct cache_basket {
     cache_data* first;
     cache_data* last;
     pthread_spinlock_t* lock;
 };
 
+/*
+* A structure describing the data storage.
+* It contains the hash function being used,
+*  which is selected during the cache initialization phase.
+*/
 struct kv_storage {
     cache_basket* kv;
     uint64_t (*hash_func)(void* key, int len, void* argv);

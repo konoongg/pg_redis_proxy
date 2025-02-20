@@ -35,6 +35,7 @@ void* start_worker(void* argv);
 extern config_redis config;
 thread_local wthread wthrd;
 
+//All obtained responses are written to the connection
 proc_status process_write(connection* conn) {
     ereport(INFO, errmsg("process_write: START"));
     event_data* w_data = conn->w_data;
@@ -74,6 +75,7 @@ proc_status process_write(connection* conn) {
     return WAIT_PROC;
 }
 
+// This event is processed solely to notify the loop that it needs to check the queue of active connections
 proc_status notify(connection* conn) {
     char code;
     int res = read(conn->fd, &code, 1);
@@ -90,6 +92,10 @@ proc_status notify(connection* conn) {
     return WAIT_PROC;
 }
 
+/*
+* After the data is read, we process it by calling the corresponding function.
+* All received requests are handled.
+*/
 proc_status process_data(connection* conn) {
     ereport(INFO, errmsg("process_data: START"));
     io_read* r_data = (io_read*)conn->r_data->data;
@@ -130,6 +136,11 @@ proc_status process_data(connection* conn) {
     }
 }
 
+/*
+* Triggered when data arrives on a connection.
+* We read data up to the size of the buffer and
+* parse all available data (e.g., if two requests are received, we process both).
+* If an error or connection closure occurs, we release the associated resources. */
 proc_status process_read(connection* conn) {
     ereport(INFO, errmsg("process_read: START"));
     exit_status status;
@@ -176,6 +187,7 @@ proc_status process_read(connection* conn) {
     return DEL_PROC;
 }
 
+// Handling the accept operation: creating a new connection and adding it to the pending queue.
 proc_status process_accept(connection* conn) {
     ereport(INFO, errmsg("process_accept: START"));
     answer_list* a_list;
@@ -233,7 +245,11 @@ proc_status process_accept(connection* conn) {
     return WAIT_PROC;
 }
 
-
+/*
+* Creating a listening socket and using an eventfd descriptor,
+* which is necessary to notify the worker to check the active events list.
+* The processing of the list is then initiated.
+*/
 void* start_worker(void* argv) {
     connection* listen_conn;
     connection* efd_conn;
@@ -284,6 +300,7 @@ void* start_worker(void* argv) {
     return NULL;
 }
 
+// Creating a worker pool; an event loop is started in each worker.
 void init_workers(void) {
     init_worker_conf conf = config.worker_conf;
     pthread_t* tids = wcalloc(conf.count_worker * sizeof(pthread_t));

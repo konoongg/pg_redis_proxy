@@ -9,10 +9,9 @@
 
 void* wcalloc(uint64_t size) {
     void* data = malloc(size);
-
     if (data == NULL) {
-        //char* err_msg = strerror(errno);
-        //ereport(ERROR, errmsg("init_worker: malloc error %s  - ", err_msg));
+        char* err_msg = strerror(errno);
+        ereport(ERROR, errmsg("init_worker: malloc error %s  - ", err_msg));
         abort();
     }
     memset(data, 0, size);

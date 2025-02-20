@@ -41,6 +41,12 @@ static void register_proxy(void) {
     RegisterBackgroundWorker(&worker);
 }
 
+
+/*
+* The application is initializing,
+* the background worker required for database synchronization is starting,
+* and the I/O workers, which handle the main tasks, are being launched.
+*/
 void proxy_start_work(Datum main_arg) {
     ereport(INFO, errmsg("start bg worker pg_redis_proxy pid: %d", getpid()));
 
