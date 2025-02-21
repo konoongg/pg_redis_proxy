@@ -1,7 +1,8 @@
 #include <assert.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <pthread.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include "postgres.h"
 #include "utils/elog.h"
@@ -197,19 +198,16 @@ void free_connection(connection* conn) {
     r_data->free_data(r_data->data);
     w_data->free_data(w_data->data);
 
-    free(r_data);
-    free(w_data);
-
     if (close(conn->fd) == -1) {
         char* err_msg = strerror(errno);
         ereport(INFO, errmsg("process_close: close() failed: %s\n", err_msg));
         abort();
     }
 
-    free(conn->r_data->handle);
-    free(conn->w_data->handle);
-    free(conn->r_data);
-    free(conn->w_data);
+    free(r_data->handle);
+    free(w_data->handle);
+    free(r_data);
+    free(w_data);
     free(conn);
 }
 
@@ -262,11 +260,11 @@ void finish_connection(connection* conn) {
 }
 
 void event_notify(int fd) {
-    char sig_ev = 0;
-    int res = write(fd, &sig_ev, 1);
+    uint64_t sig_ev = 0;
+    int res = write(fd, &sig_ev, 8);
     if (res == -1) {
         char* err = strerror(errno);
-        ereport(INFO, errmsg("register_command: write %s", err));
+        ereport(INFO, errmsg("event_notify fd %d: write %s", fd, err));
         abort();
     }
 }

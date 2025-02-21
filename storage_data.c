@@ -98,11 +98,13 @@ req_table* create_req_by_resp(char* value, int value_size) {
             attr_name_size = index_delim - start_pos;
             attr_size = cur_pos - index_delim - 1;
 
-            req->columns[0][cur_count_attr].column_name = wcalloc(attr_name_size  * sizeof(char));
-            req->columns[0][cur_count_attr].data = wcalloc(attr_size * sizeof(char));
+            req->columns[0][cur_count_attr].column_name = wcalloc((attr_name_size + 1)  * sizeof(char));
+            req->columns[0][cur_count_attr].data = wcalloc((attr_size + 1) * sizeof(char));
 
             memcpy(req->columns[0][cur_count_attr].column_name, value + start_pos, attr_name_size);
+            req->columns[0][cur_count_attr].column_name[attr_name_size] = '\0';
             memcpy(req->columns[0][cur_count_attr].data, value + index_delim + 1, attr_size);
+            req->columns[0][cur_count_attr].data[attr_size] = '\0';
             req->columns[0][cur_count_attr].data_size = attr_size;
             cur_count_attr++;
             start_pos = cur_pos + 1;

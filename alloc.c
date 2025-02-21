@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <stdint.h>
 #include <stdlib.h>
 
 #include "postgres.h"
@@ -7,7 +6,7 @@
 
 #include "alloc.h"
 
-void* wcalloc(uint64_t size) {
+void* wcalloc(size_t size) {
     void* data = malloc(size);
     if (data == NULL) {
         char* err_msg = strerror(errno);

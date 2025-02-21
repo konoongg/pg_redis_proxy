@@ -16,6 +16,7 @@ void callback(EV_P_ struct ev_io* io_handle, int revents);
 
 // Initialization of the event, in the current implementation, libev is used.
 void init_event(void* data, handle* h, int fd, event_mode mode) {
+    ereport(INFO, errmsg("init_event: fd %d", fd));
     int flag;
     if (mode == EVENT_READ) {
         flag = EV_READ;

@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/eventfd.h>
 #include <sys/eventfd.h>
@@ -77,8 +78,8 @@ proc_status process_write(connection* conn) {
 
 // This event is processed solely to notify the loop that it needs to check the queue of active connections
 proc_status notify(connection* conn) {
-    char code;
-    int res = read(conn->fd, &code, 1);
+    uint64_t code;
+    int res = read(conn->fd, &code, 8);
 
     if (res < 0 && res != EAGAIN) {
         char* err = strerror(errno);
@@ -161,6 +162,7 @@ proc_status process_read(connection* conn) {
         } else if (status == ALL) {
             while (status == ALL) {
                 status = pars_data(io_r_data);
+                ereport(INFO, errmsg("process_read: io_r_data->reqs->last->argv[0] %s", io_r_data->reqs->last->argv[0]));
             }
             stop_event(wthrd.l, conn->r_data->handle);
             conn->status = PROCESS;

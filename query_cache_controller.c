@@ -1,6 +1,7 @@
 #include <errno.h>
-#include <sys/eventfd.h>
 #include <pthread.h>
+#include <stdint.h>
+#include <sys/eventfd.h>
 
 #include "postgres.h"
 #include "utils/elog.h"
@@ -35,6 +36,8 @@ void free_db_command(command_to_db* cmd) {
 * and the database worker's loop is notified via eventfd that new events have arrived.
 */
 void register_command(char* tabl, char* req, connection* conn, com_reason reason, char* key, int key_size) {
+    ereport(INFO, errmsg("register_command: new register"));
+
     command_to_db* cmd = wcalloc(sizeof(command_to_db));
     int err;
 
@@ -62,6 +65,8 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
     }
     dbw.commands->count_commands++;
 
+
+    ereport(INFO, errmsg("register_command: bw.wthrd->efd %d", dbw.wthrd->efd));
     event_notify(dbw.wthrd->efd);
 
     err = pthread_spin_unlock(dbw.lock);
@@ -187,8 +192,9 @@ proc_status process_read_db(connection* conn) {
 * Then, we assign it new work to process the request, if any exists.
 */
 proc_status notify_db(connection* conn) {
-    char code;
-    int res = read(conn->fd, &code, 1);
+    ereport(INFO, errmsg("notify_db: START"));
+    uint64_t code;
+    int res = read(conn->fd, &code, 8);
 
     if (res < 0 && res != EAGAIN) {
         char* err = strerror(errno);
@@ -232,7 +238,7 @@ cache_data* init_cache_data(char* key, int key_size, req_table* args) {
         for (int j = 0; j < args->count_fields; ++j ) {
             column* c = get_column_info(args->table, args->columns[i][j].column_name);
             if (c == NULL) {
-                ereport(INFO, errmsg("init_cache_data: can't get column"));
+                ereport(INFO, errmsg("init_cache_data: can't get column %s in table %s ", args->columns[i][j].column_name, args->table));
                 abort();
             }
             int column_name_Size = strlen(c->column_name) + 1;
@@ -308,6 +314,7 @@ void init_db_worker(void) {
         ereport(INFO, errmsg("init_db_worker: eventfd error %s", err));
         abort();
     }
+    ereport(INFO, errmsg("init_db_worker: dbw.wthrd->efd %d", dbw.wthrd->efd));
 
     efd_conn = create_connection(dbw.wthrd->efd, dbw.wthrd);
     init_event(efd_conn, efd_conn->r_data->handle, efd_conn->fd, EVENT_READ);

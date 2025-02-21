@@ -199,9 +199,9 @@ void init_meta_data(void) {
     PQclear(res);
     for (int i = 0; i < meta->count_tables; ++i) {
         table* t = &(meta->tables[i]);
-        query = create_t_info_req(t->name);
-        res = PQexec(conn, query);
-        free(query);
+        char* query_t_info = create_t_info_req(t->name);
+        res = PQexec(conn, query_t_info);
+        free(query_t_info);
         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
             ereport(INFO, errmsg("SELECT failed: %s", PQerrorMessage(conn)));
             PQclear(res);

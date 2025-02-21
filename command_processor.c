@@ -103,6 +103,7 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     int value_size = cl_req->argv_size[2];
     req_table* new_req  = create_req_by_resp(value, value_size);
     new_req->table = get_table_name(key);
+    ereport(INFO, errmsg("do_set: new_req->table  %s", new_req->table ));
     cache_data* data = init_cache_data(key, key_size, new_req);
     char* req_to_db = create_pg_set(new_req->table, data);
 
@@ -118,7 +119,6 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     free_req(new_req);
     free_cache_data(data);
     ereport(INFO, errmsg("do_set: FINISH"));
-    //return DONE;
     return DB_REQ;
 }
 
@@ -198,7 +198,7 @@ process_result process_command(client_req* req, answer* answ, connection* conn) 
     int size_command_name;
 
 
-    ereport(INFO, errmsg("process_command: req->argc %d req->argv[0] %s", req->argc, req->argv[0]));
+    ereport(INFO, errmsg("process_command: req %p req->argc %d req->argv[0] %s", req, req->argc, req->argv[0]));
 
     hash = com_dict->hash_func(req->argv[0]);
     size_command_name = strlen(req->argv[0]) + 1;
