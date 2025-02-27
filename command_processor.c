@@ -119,7 +119,8 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     free_req(new_req);
     free_cache_data(data);
     ereport(INFO, errmsg("do_set: FINISH"));
-    return DB_REQ;
+    return DB_APPROVE;
+    //return DONE;
 }
 
 /*
@@ -151,7 +152,7 @@ process_result do_del(client_req* cl_req, answer* answ, connection* conn) {
     register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
     create_num_resp(answ, count_del);
-    return DB_REQ;
+    return DB_APPROVE;
 }
 
 void free_command(int hash) {

@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+#include "postgres.h"
+#include "utils/elog.h"
+
 #include "alloc.h"
 #include "pg_req_creater.h"
 
@@ -137,15 +140,16 @@ char* create_pg_set(char* table, cache_data* data) {
     set_values = wcalloc(set_values_size * sizeof(char));
 
     for (int i = 0; i < count_attr; ++i) {
+
         int c_name_size = strlen(data->v->values[0][i].column_name);
         memcpy(columns_name + columns_name_index, data->v->values[0][i].column_name, c_name_size);
         columns_name_index += c_name_size;
 
         memcpy(set_values + set_values_index, data->v->values[0][i].column_name, c_name_size);
-        columns_name_index += c_name_size;
+        set_values_index += c_name_size;
 
         memcpy(set_values + set_values_index, "=", 1);
-        columns_name_index += 1;
+        set_values_index += 1;
 
         switch(data->v->values[0][i].type) {
             case STRING:
@@ -154,7 +158,7 @@ char* create_pg_set(char* table, cache_data* data) {
                 columns_value_index += 1;
 
                 memcpy(columns_value + columns_value_index, str->str, str->size);
-                columns_value_index += 1;
+                columns_value_index += str->size;
 
                 memcpy(columns_value + columns_value_index, "\'", 1);
                 columns_value_index += 1;
@@ -163,7 +167,7 @@ char* create_pg_set(char* table, cache_data* data) {
                 set_values_index += 1;
 
                 memcpy(set_values + set_values_index, str->str, str->size);
-                set_values_index += 1;
+                set_values_index +=  str->size;
 
                 memcpy(set_values + set_values_index, "\'", 1);
                 set_values_index += 1;
@@ -184,8 +188,13 @@ char* create_pg_set(char* table, cache_data* data) {
         }
 
         if (i != count_attr - 1 ) {
-            memcpy(columns_name + columns_name_index,",", 1);
+            columns_name[columns_name_index] = ',';
+            set_values[set_values_index] = ',';
+            columns_value[columns_value_index] = ',';
+
             columns_name_index += 1;
+            columns_value_index += 1;
+            set_values_index += 1;
         }
     }
 
@@ -193,6 +202,5 @@ char* create_pg_set(char* table, cache_data* data) {
     bd_req = wcalloc(size_req * sizeof(char));
     snprintf(bd_req, size_req, "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s;",
                                         table, columns_name, columns_value, columns_name, set_values);
-
     return bd_req;
 }

@@ -24,6 +24,8 @@ void free_db_command(command_to_db* cmd);
 void* start_db_worker(void*);
 
 void free_db_command(command_to_db* cmd) {
+    //ereport(INFO, errmsg("free_db_command: cmd %p", cmd));
+    //ereport(INFO, errmsg("free_db_command: cmd->key %p", cmd->key));
     free(cmd->key);
     free(cmd->table);
     free(cmd->cmd);
@@ -36,7 +38,7 @@ void free_db_command(command_to_db* cmd) {
 * and the database worker's loop is notified via eventfd that new events have arrived.
 */
 void register_command(char* tabl, char* req, connection* conn, com_reason reason, char* key, int key_size) {
-    ereport(INFO, errmsg("register_command: new register"));
+    //ereport(INFO, errmsg("register_command: new register"));
 
     command_to_db* cmd = wcalloc(sizeof(command_to_db));
     int err;
@@ -53,7 +55,7 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
 
     err = pthread_spin_lock(dbw.lock);
     if (err != 0) {
-        ereport(INFO, errmsg("register_command: pthread_spin_lock %s", strerror(err)));
+        //ereport(INFO, errmsg("register_command: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
@@ -66,14 +68,14 @@ void register_command(char* tabl, char* req, connection* conn, com_reason reason
     dbw.commands->count_commands++;
 
 
-    ereport(INFO, errmsg("register_command: bw.wthrd->efd %d", dbw.wthrd->efd));
-    event_notify(dbw.wthrd->efd);
+    event_notify(dbw.wthrd->not);
 
     err = pthread_spin_unlock(dbw.lock);
     if (err != 0) {
-        ereport(INFO, errmsg("register_command: pthread_spin_unlock %s", strerror(err)));
+        //ereport(INFO, errmsg("register_command: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
+    //ereport(INFO, errmsg("register_command: FINISH %d ", dbw.wthrd->wait->first->fd));
 }
 
 // Retrieving a command for processing from the queue
@@ -82,7 +84,7 @@ command_to_db* get_command(void) {
     command_to_db* cmd;
 
     if (err != 0) {
-        ereport(INFO, errmsg("register_command: pthread_spin_lock %s", strerror(err)));
+        //ereport(INFO, errmsg("register_command: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
@@ -96,7 +98,7 @@ command_to_db* get_command(void) {
 
     err = pthread_spin_unlock(dbw.lock);
     if (err != 0) {
-        ereport(INFO, errmsg("register_command: pthread_spin_unlock %s", strerror(err)));
+        //ereport(INFO, errmsg("register_command: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
 
@@ -105,18 +107,27 @@ command_to_db* get_command(void) {
 
 // If we have a request, we send it to the database
 proc_status process_write_db(connection* conn) {
+    //ereport(INFO, errmsg("process_write_db: START conn %p", conn));
     backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
+    //ereport(INFO, errmsg("process_write_db:cmd %s", cmd->cmd));
     db_oper_res res = write_to_db(back->conn_with_db, cmd->cmd);
     if (res == WRITE_OPER_RES) {
+        //ereport(INFO, errmsg("process_write_db: WRITE_OPER_RES"));
         conn->proc = process_read_db;
         conn->status = READ_DB;
         move_from_active_to_wait(conn);
+
+        stop_event(dbw.wthrd->l, conn->w_data->handle);
+        start_event(dbw.wthrd->l, conn->r_data->handle);
+
         return WAIT_PROC;
     } else if (res == WAIT_OPER_RES) {
+        //ereport(INFO, errmsg("process_write_db: WAIT_OPER_RES"));
         move_from_active_to_wait(conn);
         return WAIT_PROC;
     } else  if (res == ERR_OPER_RES) {
+        //ereport(INFO, errmsg("process_write_db: ERR_OPER_RES"));
         free_connection(dbw.backends->conn);
         abort();
     }
@@ -133,6 +144,7 @@ proc_status process_write_db(connection* conn) {
 * event loop via eventfd that we have finished using the PostgreSQL connection
 */
 proc_status process_read_db(connection* conn) {
+    //ereport(INFO, errmsg("process_read_db: START conn %p", conn));
     backend* back = (backend*)conn->data;
     command_to_db* cmd = conn->w_data->data;
     int err;
@@ -142,10 +154,12 @@ proc_status process_read_db(connection* conn) {
     if (res == READ_OPER_RES) {
         back->is_free = true;
         move_from_active_to_wait(conn);
+        conn->proc = notify_db;
+        conn->status = NOTIFY_DB;
         move_from_wait_to_active(cmd->conn);
 
         cmd = conn->w_data->data;
-        event_notify(cmd->conn->wthrd->efd);
+        event_notify(cmd->conn->wthrd->not);
 
         if (cmd->reason == CACHE_UPDATE) {
             char* key = cmd->key;
@@ -159,18 +173,18 @@ proc_status process_read_db(connection* conn) {
 
         err = pthread_spin_lock(dbw.lock);
         if (err != 0) {
-            ereport(INFO, errmsg("process_read_db: pthread_spin_lock %s", strerror(err)));
+            //ereport(INFO, errmsg("process_read_db: pthread_spin_lock %s", strerror(err)));
             abort();
         }
 
-        event_notify(conn->wthrd->efd);
+        event_notify(conn->wthrd->not);
 
         err = pthread_spin_unlock(dbw.lock);
         if (err != 0) {
-            ereport(INFO, errmsg("process_read_db: pthread_spin_unlock %s", strerror(err)));
+            //ereport(INFO, errmsg("process_read_db: pthread_spin_unlock %s", strerror(err)));
             abort();
         }
-
+        stop_event(dbw.wthrd->l, conn->r_data->handle);
         return WAIT_PROC;
     } else if (res == WAIT_OPER_RES) {
         move_from_active_to_wait(conn);
@@ -192,19 +206,22 @@ proc_status process_read_db(connection* conn) {
 * Then, we assign it new work to process the request, if any exists.
 */
 proc_status notify_db(connection* conn) {
-    ereport(INFO, errmsg("notify_db: START"));
-    uint64_t code;
-    int res = read(conn->fd, &code, 8);
+    //ereport(INFO, errmsg("notify_db: START  conn %p", conn));
 
-    if (res < 0 && res != EAGAIN) {
-        char* err = strerror(errno);
-        ereport(INFO, errmsg("notify: read error %s", err));
-        abort();
-    } else if (res == 0 || res == EAGAIN) {
+    not_status not_s = event_get_notify(conn->wthrd->not);
+    if (not_s == NOT_TA) {
+        //ereport(INFO, errmsg("notify_db: not_s == NOT_TA"));
         return ALIVE_PROC;
     }
 
+    if (dbw.commands->count_commands == 0) {
+        move_from_active_to_wait(conn);
+        return WAIT_PROC;
+    }
+
+    //ereport(INFO, errmsg("notify_db: get not %d",  dbw.count_backends));
     for (int i = 0; i < dbw.count_backends; ++i) {
+        //ereport(INFO, errmsg("notify_db: bw.backends[%d].is_free %d", i, dbw.backends[i].is_free ));
         if (dbw.backends[i].is_free) {
             dbw.backends[i].is_free = false;
             move_from_wait_to_active(dbw.backends[i].conn);
@@ -213,6 +230,7 @@ proc_status notify_db(connection* conn) {
             dbw.backends[i].conn->proc = process_write_db;
             dbw.backends[i].conn->status = WRITE_DB;
 
+            //ereport(INFO, errmsg("notify_db: start_event %d", i));
             start_event(dbw.wthrd->l, dbw.backends[i].conn->w_data->handle);
             break;
         }
@@ -236,16 +254,17 @@ cache_data* init_cache_data(char* key, int key_size, req_table* args) {
         data->v->values[i] = wcalloc(args->count_fields * sizeof(attr));
 
         for (int j = 0; j < args->count_fields; ++j ) {
+            int column_name_size;
             column* c = get_column_info(args->table, args->columns[i][j].column_name);
             if (c == NULL) {
-                ereport(INFO, errmsg("init_cache_data: can't get column %s in table %s ", args->columns[i][j].column_name, args->table));
+                //ereport(INFO, errmsg("init_cache_data: can't get column %s in table %s ", args->columns[i][j].column_name, args->table));
                 abort();
             }
-            int column_name_Size = strlen(c->column_name) + 1;
+            column_name_size = strlen(c->column_name) + 1;
             attr* a = &(data->v->values[i][j]);
             a->type = c->type;
-            a->column_name = wcalloc(column_name_Size * sizeof(char) );
-            memcpy(a->column_name, args->columns[i][j].column_name, column_name_Size);
+            a->column_name = wcalloc(column_name_size * sizeof(char) );
+            memcpy(a->column_name, args->columns[i][j].column_name, column_name_size);
             a->is_nullable = c->is_nullable;
 
 
@@ -271,9 +290,11 @@ void free_cache_data(cache_data* data) {
 }
 
 void* start_db_worker(void*) {
+    //ereport(INFO, errmsg("start_db_worker: START"));
     while (true) {
         CHECK_FOR_INTERRUPTS();
         loop_run(dbw.wthrd->l);
+        //ereport(INFO, errmsg("start_db_worker: loop_step"));
         loop_step(dbw.wthrd);
     }
 }
@@ -281,12 +302,12 @@ void* start_db_worker(void*) {
 
 /*
 * Initializing the database, creating a loop to track events,
-*  including setting up a connection with eventfd
+* including setting up a connection with eventfd
 * to monitor notifications about new tasks being added.
 */
 void init_db_worker(void) {
-
     connection* efd_conn;
+    int efd ;
     int err;
     pthread_t db_tid;
 
@@ -304,23 +325,18 @@ void init_db_worker(void) {
     dbw.lock = wcalloc(sizeof(pthread_spinlock_t));
     err = pthread_spin_init(dbw.lock, PTHREAD_PROCESS_PRIVATE);
     if (err != 0) {
-        ereport(INFO, errmsg("init_db_worker: pthread_spin_lock %s", strerror(err)));
+        //ereport(INFO, errmsg("init_db_worker: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
-    dbw.wthrd->efd = eventfd(0, EFD_NONBLOCK);
-    if (dbw.wthrd->efd == -1) {
-        char* err = strerror(errno);
-        ereport(INFO, errmsg("init_db_worker: eventfd error %s", err));
-        abort();
-    }
-    ereport(INFO, errmsg("init_db_worker: dbw.wthrd->efd %d", dbw.wthrd->efd));
+    efd = create_ev_notify(dbw.wthrd);
 
-    efd_conn = create_connection(dbw.wthrd->efd, dbw.wthrd);
-    init_event(efd_conn, efd_conn->r_data->handle, efd_conn->fd, EVENT_READ);
-    add_wait(efd_conn);
+    efd_conn = create_connection(efd, dbw.wthrd);
     efd_conn->proc = notify_db;
     efd_conn->status = NOTIFY_DB;
+
+    init_event(efd_conn, efd_conn->r_data->handle, efd_conn->fd, EVENT_READ);
+    add_wait(efd_conn);
 
 
     for (int i = 0; i < dbw.count_backends; ++i) {
@@ -329,13 +345,14 @@ void init_db_worker(void) {
         init_event(db_conn, db_conn->w_data->handle, db_conn->fd, EVENT_WRITE);
         add_wait(db_conn);
         dbw.backends[i].conn = db_conn;
+        dbw.backends[i].is_free = true;
     }
 
     start_event(dbw.wthrd->l,  efd_conn->r_data->handle);
 
     err = pthread_create(&(db_tid), NULL, start_db_worker, NULL);
     if (err) {
-        ereport(INFO, errmsg("init_worker: pthread_create error %s", strerror(err)));
+        //ereport(INFO, errmsg("init_worker: pthread_create error %s", strerror(err)));
         abort();
     }
 }

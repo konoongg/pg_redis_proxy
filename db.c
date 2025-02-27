@@ -32,7 +32,8 @@ void finish_connects(backend* backends) {
 * If we can write the data, write itand return WRITE_OPER_RES.
 */
 db_oper_res write_to_db(PGconn* conn, char* req) {
-    if (PQconnectPoll(conn) == PGRES_POLLING_WRITING) {
+    ereport(INFO, errmsg("write_to_db: START"));
+    if (PQconnectPoll(conn) == PGRES_POLLING_WRITING || PQconnectPoll(conn) == PGRES_POLLING_READING) {
         return WAIT_OPER_RES;
     } else if (PQconnectPoll(conn) == PGRES_POLLING_FAILED) {
         return ERR_OPER_RES;

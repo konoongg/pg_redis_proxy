@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "postgres.h"
+#include "utils/elog.h"
+
 #include "libpq-fe.h"
 
 #include "alloc.h"
@@ -125,10 +128,12 @@ req_table* create_req_by_pg(PGresult* res, char* table) {
 
     req->columns = wcalloc(req->count_tuples * sizeof(req_column*));
 
+    ereport(INFO, errmsg("create_req_by_pg: req->count_tuples %d req->count_fields %d",  req->count_tuples, req->count_fields ));
     for (int row = 0; row < req->count_tuples; ++row) {
         req->columns[row] = wcalloc(req->count_fields * sizeof(req_column));
         for (int column = 0; column < req->count_fields; ++column) {
             char* column_name = PQfname(res, column);
+            ereport(INFO, errmsg("create_req_by_pg: column_name %s",  column_name));
             char* value;
             int value_size;
             int column_name_size;
@@ -143,6 +148,8 @@ req_table* create_req_by_pg(PGresult* res, char* table) {
             memcpy(req->columns[row][column].column_name, column_name, column_name_size);
 
             value = PQgetvalue(res, row, column);
+
+            ereport(INFO, errmsg("create_req_by_pg: value %s",  value));
             if (value == NULL) {
                 free_req(req);
                 return NULL;

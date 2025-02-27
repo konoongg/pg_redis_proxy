@@ -96,7 +96,7 @@ func simpleSetTest(test *Test) bool {
 	}
 	defer conn.Close()
 
-	request := []byte("*3\r\n$3\r\nset\r\n$26\r\ntest.test1.simple_set_test\r\n$37\r\ntest1:simple_set_test.test2:2.test3:3\r\n")
+	request := []byte("*3\r\n$3\r\nset\r\n$26\r\ntest.test1.simple_set_test\r\n$37\r\ntest1:simple_set_test.test2:4.test3:3\r\n")
 	res := DoTest(conn.connToCache, test, request)
 	if err != nil {
 		test.err = "set error"

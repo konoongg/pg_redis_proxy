@@ -14,12 +14,14 @@
 void add(connection* conn, conn_list* list) ;
 void delete(connection* conn, conn_list* list);
 void free_wthread(wthread* wthrd);
+void init_notify(e_notify* not);
+void not_close(e_notify* not);
 
 // Adding an element to the event list.
 void add(connection* conn, conn_list* list) {
+    conn->next = NULL;
+    conn->prev = NULL;
     if (list->first == NULL) {
-        conn->prev = NULL;
-        conn->next = NULL;
         list->first = list->last = conn;
     } else {
         conn->prev = list->last;
@@ -31,18 +33,17 @@ void add(connection* conn, conn_list* list) {
 // Removes an event from the list.
 void delete(connection* conn, conn_list* list) {
     assert(list->first);
-    ereport(INFO, errmsg("delete: start conn %p", conn));
     if (conn->prev == NULL) {
-        ereport(INFO, errmsg("delete: conn->prev == NULL "));
         list->first = conn->next;
-        ereport(INFO, errmsg("delete: list->first %p", list->first));
+        if (conn->next) {
+            conn->next->prev = NULL;
+        }
     } else {
         conn->prev->next = conn->next;
     }
 
     if (conn->next == NULL) {
         list->last = conn->prev;
-        ereport(INFO, errmsg("delete: conn->next == NULL list->last  %p", list->last ));
     }
 }
 
@@ -56,11 +57,11 @@ void delete(connection* conn, conn_list* list) {
 void add_active(connection* conn) {
     int err = pthread_spin_lock(conn->wthrd->lock);
     if (err != 0) {
-        ereport(INFO, errmsg("add_active: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
     conn->is_wait = false;
+
     add(conn, conn->wthrd->active);
     conn->wthrd->active_size++;
 
@@ -89,7 +90,6 @@ void delete_active(connection* conn) {
 }
 
 void add_wait(connection* conn) {
-    ereport(INFO, errmsg("add_wait: conn %p", conn));
 
     int err = pthread_spin_lock(conn->wthrd->lock);
     if (err != 0) {
@@ -110,6 +110,7 @@ void add_wait(connection* conn) {
 
 
 void delete_wait(connection* conn) {
+
     int err = pthread_spin_lock(conn->wthrd->lock);
     if (err != 0) {
         ereport(INFO, errmsg("delete_wait: pthread_spin_lock %s", strerror(err)));
@@ -132,28 +133,32 @@ void move_from_active_to_wait(connection* conn) {
         ereport(INFO, errmsg("move_from_active_to_wait: pthread_spin_lock %s", strerror(err)));
         abort();
     }
-
+    assert(!conn->is_wait);
     delete(conn, conn->wthrd->active);
     conn->wthrd->active_size--;
     conn->is_wait = true;
     add(conn, conn->wthrd->wait);
     conn->wthrd->wait_size++;
 
+
+
     err = pthread_spin_unlock(conn->wthrd->lock);
     if (err != 0) {
         ereport(INFO, errmsg("move_from_active_to_wait: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
+
 }
 
 void move_from_wait_to_active(connection* conn) {
+
     int err = pthread_spin_lock(conn->wthrd->lock);
     if (err != 0) {
         ereport(INFO, errmsg("move_from_wait_to_active: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
-    ereport(INFO, errmsg("move_from_wait_to_active: conn %p", conn));
+    assert(conn->is_wait);
     delete(conn, conn->wthrd->wait);
     conn->wthrd->wait_size--;
     conn->is_wait = false;
@@ -162,7 +167,6 @@ void move_from_wait_to_active(connection* conn) {
 
     err = pthread_spin_unlock(conn->wthrd->lock);
     if (err != 0) {
-
         ereport(INFO, errmsg("move_from_wait_to_active: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
@@ -191,7 +195,6 @@ connection* create_connection(int fd, wthread* wthrd) {
 }
 
 void free_connection(connection* conn) {
-    ereport(INFO, errmsg("free_connection:"));
     event_data* r_data = (event_data*)conn->r_data;
     event_data* w_data = (event_data*)conn->w_data;
 
@@ -233,10 +236,10 @@ void init_wthread(wthread* wthrd) {
 
 void loop_step(wthread* wthrd) {
     while (wthrd->active_size != 0) {
-        ereport(INFO, errmsg("loop_step: thrd->active->first  %p", wthrd->active->first));
         connection* cur_conn = wthrd->active->first;
         while (cur_conn != NULL) {
             connection* cur_conn_next = cur_conn->next;
+            ereport(INFO, errmsg("loop_step: cur_conn %p cur_conn_next %p cur_conn is wait %d", cur_conn, cur_conn_next, cur_conn->is_wait));
             assert(!cur_conn->is_wait);
             cur_conn->proc(cur_conn);
             cur_conn = cur_conn_next;
@@ -244,27 +247,57 @@ void loop_step(wthread* wthrd) {
     }
 }
 
+void not_close(e_notify* not) {
+    close(not->pipe_fd[0]);
+    close(not->pipe_fd[1]);
+    free(not);
+}
+
 void free_wthread(wthread* wthrd) {
+    not_close(wthrd->not);
     close(wthrd->listen_socket);
-    close(wthrd->efd);
     free(wthrd->active);
     free(wthrd->wait);
     loop_destroy(wthrd->l);
 }
 
 void finish_connection(connection* conn) {
-    ereport(INFO, errmsg("finish_connection:"));
     stop_event(conn->wthrd->l, conn->r_data->handle);
     stop_event(conn->wthrd->l, conn->w_data->handle);
     free_connection(conn);
 }
 
-void event_notify(int fd) {
-    uint64_t sig_ev = 0;
-    int res = write(fd, &sig_ev, 8);
+void event_notify(e_notify* not) {
+    char sig_ev = 0;
+    int res = write(not->pipe_fd[1], &sig_ev, 1);
     if (res == -1) {
         char* err = strerror(errno);
-        ereport(INFO, errmsg("event_notify fd %d: write %s", fd, err));
+        ereport(INFO, errmsg("event_notify fd %d: write %s", not->pipe_fd[1], err));
         abort();
     }
 }
+
+not_status event_get_notify(e_notify* not) {
+    char code;
+    int res = read(not->pipe_fd[0], &code, 1);
+
+    if (res < 0 && res != EAGAIN) {
+        char* err = strerror(errno);
+        ereport(INFO, errmsg("notify: read error %s", err));
+        abort();
+    } else if (res == 0 || res == EAGAIN) {
+        return NOT_TA;
+    }
+    return NOT_OK;
+}
+
+int create_ev_notify(wthread* wthrd) {
+    wthrd->not = wcalloc(sizeof(e_notify));
+    int err = pipe(wthrd->not->pipe_fd);
+    if (err == -1) {
+        ereport(INFO, errmsg("init_notify: pipe error %s", strerror(err)));
+        abort();
+    }
+    return wthrd->not->pipe_fd[0];
+}
+

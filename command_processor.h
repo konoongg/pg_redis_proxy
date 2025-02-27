@@ -52,9 +52,10 @@ struct entris {
 *   and it is necessary to wait for its response.
 */
 enum process_result {
+    DB_APPROVE,
+    DB_REQ,
     DONE,
     PROCESS_ERR,
-    DB_REQ,
 };
 
 #endif

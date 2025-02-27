@@ -153,21 +153,17 @@ value* get_cache(char* key, int key_size) {
 * If it does, the data is updated; if not, new data is added.
 */
 void set_cache(cache_data* new_data) {
-    ereport(INFO, errmsg("set_cache: START"));
     cache_basket* basket;
     cache_data* data;
     int err;
 
-    ereport(INFO, errmsg("set_cache: get_basket"));
     basket = get_basket(new_data->key, new_data->key_size);
 
-    ereport(INFO, errmsg("set_cache: try lock"));
     err = pthread_spin_lock(basket->lock);
     if (err != 0) {
         ereport(INFO, errmsg("get_cache: pthread_spin_lock %s", strerror(err)));
         abort();
     }
-     ereport(INFO, errmsg("set_cache: suc lock"));
 
     data = find_data_in_basket(basket, new_data->key, new_data->key_size);
     if (data == NULL) {
@@ -198,7 +194,6 @@ void set_cache(cache_data* new_data) {
         ereport(INFO, errmsg("set_cache: pthread_spin_unlock %s", strerror(err)));
         abort();
     }
-    ereport(INFO, errmsg("set_cache: END"));
 }
 
 int delete_cache(char* key, int key_size) {

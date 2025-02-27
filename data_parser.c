@@ -26,7 +26,6 @@ void replace_part_of_buffer(io_read* data, int cur_buffer_index) {
  * parsing will continue correctly.
  */
 exit_status pars_data(io_read* data) {
-    ereport(INFO, errmsg("pars_data: START"));
     int cur_buffer_index  = 0;
     for (; cur_buffer_index < data->cur_buffer_size; ++cur_buffer_index) {
         char c = data->read_buffer[cur_buffer_index];
@@ -40,11 +39,9 @@ exit_status pars_data(io_read* data) {
         } else if (c == '\r' && cur_status == ARGC_WAIT) {
 
             if (data->reqs->first == NULL) {
-                ereport(INFO, errmsg("pars_data:data->reqs->first == NULL"));
                 data->reqs->first = (client_req*)wcalloc(sizeof(client_req));
                 data->reqs->last = data->reqs->first;
             } else {
-                ereport(INFO, errmsg("pars_data:data->reqs->first"));
                 data->reqs->last->next = (client_req*)wcalloc(sizeof(client_req));
                 data->reqs->last = data->reqs->last->next;
             }
@@ -52,10 +49,6 @@ exit_status pars_data(io_read* data) {
             data->reqs->last->argc = data->pars.parsing_num;
             data->reqs->last->argv = wcalloc(data->reqs->last->argc * sizeof(char*));
             data->reqs->last->argv_size = wcalloc(data->reqs->last->argc * sizeof(int));
-
-
-            ereport(INFO, errmsg("pars_data: data->reqs->last->argv%p ", data->reqs->last->argv));
-            ereport(INFO, errmsg("pars_data: data->reqs->last->argv_size %p ", data->reqs->last->argv_size));
 
             data->pars.parsing_num = 0;
             data->pars.next_read_status = START_STRING_WAIT;
@@ -79,16 +72,11 @@ exit_status pars_data(io_read* data) {
 
             if (data->pars.cur_size_str == data->pars.size_str) {
                 data->pars.parsing_str[data->pars.size_str] = '\0';
-                ereport(INFO, errmsg("pars_data: data->pars.parsing_str %s", data->pars.parsing_str));
                 new_str = (char*)wcalloc((data->pars.size_str + 1) * sizeof(char));
-                ereport(INFO, errmsg("pars_data: new_str %p ", new_str));
                 memcpy(new_str, data->pars.parsing_str, data->pars.size_str + 1);
                 data->reqs->last->argv[data->pars.cur_count_argv] = new_str;
 
                 data->reqs->last->argv_size[data->pars.cur_count_argv] = data->pars.cur_size_str;
-                ereport(INFO, errmsg("pars_data:  data->reqs->last->argv_size %p ",  data->reqs->last->argv_size ));
-                ereport(INFO, errmsg("pars_data: !!!data->reqs->last->argv[0] %s %p ", data->reqs->last->argv[0],  data->reqs->last->argv[0]));
-                ereport(INFO, errmsg("pars_data:data->pars.parsing_str %p %s", data->pars.parsing_str, data->pars.parsing_str));
 
                 free(data->pars.parsing_str);
                 data->pars.parsing_str = NULL;
@@ -118,6 +106,5 @@ exit_status pars_data(io_read* data) {
         replace_part_of_buffer(data, cur_buffer_index);
         return ALL;
     }
-    ereport(INFO, errmsg("pars_data: FINISH NOT ALL"));
     return NOT_ALL;
 }
