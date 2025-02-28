@@ -19,6 +19,7 @@ extern config_redis config;
 extern default_resp_answer def_resp;
 command_dict* com_dict;
 
+char* get_column(char* key);
 char* get_table_name(char* key);
 process_result do_del(client_req* cl_req, answer* answ, connection* conn);
 process_result do_get(client_req* cl_req, answer* answ, connection* conn);
@@ -49,6 +50,29 @@ char* get_table_name(char* key) {
     }
 }
 
+char* get_column(char* key) {
+    char* dot_position_s;
+    char* dot_position_f;
+    int length;
+    char* table_column;
+
+    dot_position_f = strchr(key, '.');
+    if (dot_position_f == NULL) {
+        return NULL;
+    }
+    dot_position_s = strchr(dot_position_f + 1, '.');
+    if (dot_position_s == NULL) {
+        return NULL;
+    }
+
+    length = dot_position_s - dot_position_f - 1;
+    table_column = wcalloc((length + 1) * sizeof(char));
+    memcpy(table_column, dot_position_f + 1, length);
+    table_column[length] = '\0';
+    return table_column;
+}
+
+
 //In the case of receiving a PING command, send PONG back to the user.
 process_result do_ping(client_req* req, answer* answ, connection* conn) {
     answ->answer_size = def_resp.pong.answer_size;
@@ -66,8 +90,6 @@ process_result do_ping(client_req* req, answer* answ, connection* conn) {
 * and return a code indicating that the client needs to wait for the data to be retrieved.
 */
 process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
-    ereport(INFO, errmsg("do_get: START"));
-
     char* key = cl_req->argv[1];
     int key_size = cl_req->argv_size[1];
     value* v = get_cache(key, key_size);
@@ -96,16 +118,18 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
 * and an event is registered to update the data in the database.
 */
 process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
-    ereport(INFO, errmsg("do_set: START"));
     char* key = cl_req->argv[1];
     char* value = cl_req->argv[2];
     int key_size = cl_req->argv_size[1];
     int value_size = cl_req->argv_size[2];
+    char* key_column;
+    char* req_to_db;
+
     req_table* new_req  = create_req_by_resp(value, value_size);
     new_req->table = get_table_name(key);
-    ereport(INFO, errmsg("do_set: new_req->table  %s", new_req->table ));
+    key_column = get_column(key);
     cache_data* data = init_cache_data(key, key_size, new_req);
-    char* req_to_db = create_pg_set(new_req->table, data);
+    req_to_db = create_pg_set(new_req->table, key_column, data);
 
     set_cache(data);
 
@@ -118,7 +142,6 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
 
     free_req(new_req);
     free_cache_data(data);
-    ereport(INFO, errmsg("do_set: FINISH"));
     return DB_APPROVE;
     //return DONE;
 }
@@ -197,9 +220,6 @@ process_result process_command(client_req* req, answer* answ, connection* conn) 
     command_entry* cur_command;
     int hash;
     int size_command_name;
-
-
-    ereport(INFO, errmsg("process_command: req %p req->argc %d req->argv[0] %s", req, req->argc, req->argv[0]));
 
     hash = com_dict->hash_func(req->argv[0]);
     size_command_name = strlen(req->argv[0]) + 1;

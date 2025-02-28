@@ -32,7 +32,6 @@ void finish_connects(backend* backends) {
 * If we can write the data, write itand return WRITE_OPER_RES.
 */
 db_oper_res write_to_db(PGconn* conn, char* req) {
-    ereport(INFO, errmsg("write_to_db: START"));
     if (PQconnectPoll(conn) == PGRES_POLLING_WRITING || PQconnectPoll(conn) == PGRES_POLLING_READING) {
         return WAIT_OPER_RES;
     } else if (PQconnectPoll(conn) == PGRES_POLLING_FAILED) {
@@ -66,13 +65,11 @@ db_oper_res read_from_db(PGconn* conn, char* t, req_table** req) {
         PQclear(res);
 
         if (*req == NULL) {
-            ereport(INFO, errmsg("read_from_db: can't get value"));
             return ERR_OPER_RES;
         }
 
         res = PQgetResult(conn);
         if (res != NULL) {
-            ereport(INFO, errmsg("read_from_db: second res - error"));
             return ERR_OPER_RES;
         }
 
@@ -159,14 +156,12 @@ column* get_column_info(char* table_name, char* column_name) {
 }
 
 void init_db(backend* back) {
-    ereport(INFO, errmsg("init_db: START"));
     init_meta_data();
     connect_to_db(back);
 }
 
 // Retrieve all tables and their columns along with their data types.
 void init_meta_data(void) {
-    ereport(INFO, errmsg("init_meta_data: START"));
     PGresult* res;
     PGconn* conn;
     char* conn_info;
@@ -188,7 +183,6 @@ void init_meta_data(void) {
 
     meta->count_tables = PQntuples(res);
 
-    ereport(INFO, errmsg("init_meta_data: meta->count_tables %d", meta->count_tables));
     meta->tables = wcalloc(meta->count_tables * sizeof(table));
     for (int i = 0; i < meta->count_tables; ++i) {
         char* table_name = PQgetvalue(res, i, 0);

@@ -24,8 +24,6 @@ void free_db_command(command_to_db* cmd);
 void* start_db_worker(void*);
 
 void free_db_command(command_to_db* cmd) {
-    //ereport(INFO, errmsg("free_db_command: cmd %p", cmd));
-    //ereport(INFO, errmsg("free_db_command: cmd->key %p", cmd->key));
     free(cmd->key);
     free(cmd->table);
     free(cmd->cmd);
@@ -38,7 +36,7 @@ void free_db_command(command_to_db* cmd) {
 * and the database worker's loop is notified via eventfd that new events have arrived.
 */
 void register_command(char* tabl, char* req, connection* conn, com_reason reason, char* key, int key_size) {
-    //ereport(INFO, errmsg("register_command: new register"));
+    ereport(INFO, errmsg("register_command: new register %s", req));
 
     command_to_db* cmd = wcalloc(sizeof(command_to_db));
     int err;
@@ -173,7 +171,7 @@ proc_status process_read_db(connection* conn) {
 
         err = pthread_spin_lock(dbw.lock);
         if (err != 0) {
-            //ereport(INFO, errmsg("process_read_db: pthread_spin_lock %s", strerror(err)));
+            ereport(INFO, errmsg("process_read_db: pthread_spin_lock %s", strerror(err)));
             abort();
         }
 
@@ -181,7 +179,7 @@ proc_status process_read_db(connection* conn) {
 
         err = pthread_spin_unlock(dbw.lock);
         if (err != 0) {
-            //ereport(INFO, errmsg("process_read_db: pthread_spin_unlock %s", strerror(err)));
+            ereport(INFO, errmsg("process_read_db: pthread_spin_unlock %s", strerror(err)));
             abort();
         }
         stop_event(dbw.wthrd->l, conn->r_data->handle);

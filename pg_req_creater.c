@@ -97,7 +97,7 @@ char* create_pg_del(int count, char** keys, int* keys_size) {
     return bd_req;
 }
 
-char* create_pg_set(char* table, cache_data* data) {
+char* create_pg_set(char* table, char* column, cache_data* data) {
     char* bd_req;
     int size_req = SET_BASE_SIZE;
 
@@ -201,6 +201,6 @@ char* create_pg_set(char* table, cache_data* data) {
     size_req += strlen(table) + 2 * columns_name_size + columns_value_size + set_values_size;
     bd_req = wcalloc(size_req * sizeof(char));
     snprintf(bd_req, size_req, "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s;",
-                                        table, columns_name, columns_value, columns_name, set_values);
+                                        table, columns_name, columns_value, column, set_values);
     return bd_req;
 }
