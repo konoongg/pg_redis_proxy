@@ -287,19 +287,19 @@ func escapeSpecialChars(data []byte) string {
 func main() {
 
 	tests := []Test{
-		{
-			testName: "simple set test",
-			callback: simpleSetTest,
-		},
+		// {
+		// 	testName: "simple set test",
+		// 	callback: simpleSetTest,
+		// },
 
 		// {
-		// 	testName: "simple sel test x2",
+		// 	testName: "simple set test x2",
 		// 	callback: simpleSetTest_x2,
 		// },
-		// {
-		// 	testName: "simple get test",
-		// 	callback: simpleGetTest,
-		// },
+		{
+			testName: "simple get test",
+			callback: simpleGetTest,
+		},
 		// {
 		// 	testName: "simple del test",
 		// 	callback: simpleDelTest,

@@ -90,6 +90,7 @@ process_result do_ping(client_req* req, answer* answ, connection* conn) {
 * and return a code indicating that the client needs to wait for the data to be retrieved.
 */
 process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
+    ereport(INFO, errmsg("do_get: START"));
     char* key = cl_req->argv[1];
     int key_size = cl_req->argv_size[1];
     value* v = get_cache(key, key_size);
@@ -97,7 +98,7 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
     if (v == NULL) {
         char* table_name = get_table_name(key);
         char* req_to_db = create_pg_get(key, key_size);
-
+        ereport(INFO, errmsg("do_get: req_to_db %s", req_to_db));
         move_from_active_to_wait(conn);
         register_command(table_name, req_to_db, conn, CACHE_UPDATE, key, key_size);
 
@@ -118,6 +119,7 @@ process_result do_get(client_req* cl_req, answer* answ, connection* conn) {
 * and an event is registered to update the data in the database.
 */
 process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
+    ereport(INFO, errmsg("do_set: START"));
     char* key = cl_req->argv[1];
     char* value = cl_req->argv[2];
     int key_size = cl_req->argv_size[1];
@@ -143,7 +145,6 @@ process_result do_set(client_req* cl_req, answer* answ, connection* conn) {
     free_req(new_req);
     free_cache_data(data);
     return DB_APPROVE;
-    //return DONE;
 }
 
 /*

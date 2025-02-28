@@ -130,6 +130,8 @@ proc_status process_data(connection* conn) {
         } else if (res == DB_APPROVE) {
             conn->proc = process_write;
             conn->status = WRITE;
+            r_data->reqs->first = r_data->reqs->first->next;
+            free_cl_req(cur_req);
             return WAIT_PROC;
         } else if  (res == PROCESS_ERR) {
             abort();

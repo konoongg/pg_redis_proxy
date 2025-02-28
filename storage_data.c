@@ -119,21 +119,20 @@ req_table* create_req_by_resp(char* value, int value_size) {
 // Creating a structure describing the cached data based on data received from the database.
 req_table* create_req_by_pg(PGresult* res, char* table) {
     req_table* req = wcalloc(sizeof(req_table));
-
-    req->table = wcalloc(strlen(table) * sizeof(char));
+    int table_name_size = strlen(table);
+    req->table = wcalloc((table_name_size + 1)  * sizeof(char));
     memcpy(req->table, table, strlen(table));
+    req->table[table_name_size] = '\0';
 
     req->count_tuples = PQntuples(res);
     req->count_fields = PQnfields(res);
 
     req->columns = wcalloc(req->count_tuples * sizeof(req_column*));
 
-    ereport(INFO, errmsg("create_req_by_pg: req->count_tuples %d req->count_fields %d",  req->count_tuples, req->count_fields ));
     for (int row = 0; row < req->count_tuples; ++row) {
         req->columns[row] = wcalloc(req->count_fields * sizeof(req_column));
         for (int column = 0; column < req->count_fields; ++column) {
             char* column_name = PQfname(res, column);
-            ereport(INFO, errmsg("create_req_by_pg: column_name %s",  column_name));
             char* value;
             int value_size;
             int column_name_size;
@@ -144,12 +143,11 @@ req_table* create_req_by_pg(PGresult* res, char* table) {
             }
 
             column_name_size = strlen(column_name);
-            req->columns[row][column].column_name = wcalloc( column_name_size* sizeof(char));
+            req->columns[row][column].column_name = wcalloc( (column_name_size + 1) * sizeof(char));
             memcpy(req->columns[row][column].column_name, column_name, column_name_size);
+            req->columns[row][column].column_name[column_name_size] = '\0';
 
             value = PQgetvalue(res, row, column);
-
-            ereport(INFO, errmsg("create_req_by_pg: value %s",  value));
             if (value == NULL) {
                 free_req(req);
                 return NULL;

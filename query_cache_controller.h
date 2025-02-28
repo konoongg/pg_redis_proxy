@@ -46,7 +46,7 @@ struct list_command {
 /*
 * A structure describing the database worker.
 * It contains a queue of commands to be executed,
-* an event loop, and a pool of backends through 
+* an event loop, and a pool of backends through
 * which interaction with the database occurs.
 */
 struct db_worker {

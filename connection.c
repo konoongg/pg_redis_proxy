@@ -57,6 +57,7 @@ void delete(connection* conn, conn_list* list) {
 void add_active(connection* conn) {
     int err = pthread_spin_lock(conn->wthrd->lock);
     if (err != 0) {
+        ereport(INFO, errmsg("add_active: pthread_spin_lock %s", strerror(err)));
         abort();
     }
 
@@ -239,7 +240,6 @@ void loop_step(wthread* wthrd) {
         connection* cur_conn = wthrd->active->first;
         while (cur_conn != NULL) {
             connection* cur_conn_next = cur_conn->next;
-            ereport(INFO, errmsg("loop_step: cur_conn %p cur_conn_next %p cur_conn is wait %d", cur_conn, cur_conn_next, cur_conn->is_wait));
             assert(!cur_conn->is_wait);
             cur_conn->proc(cur_conn);
             cur_conn = cur_conn_next;
